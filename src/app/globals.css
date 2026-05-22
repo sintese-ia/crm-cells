@@ -1,26 +1,124 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Alias Extended', 'DM Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Cells brand colors (paleta v6) */
+  --color-carbon: #0D0D0D;
+  --color-graphite: #1A1A1A;
+  --color-steel: #2A2A2A;
+  --color-titanium: #6B6B6B;
+  --color-bone: #F2F0EC;
+  --color-signal: #D4541A;
+  --color-signal-soft: #D4772C;
+  --color-signal-deep: #BF360C;
+  --color-blueprint: #1C2A35;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@font-face {
+  font-family: 'Alias Extended';
+  src: url('https://cdn.shopify.com/s/files/1/0594/4338/0358/files/alias-regular.otf?v=1768319702') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Alias Extended';
+  src: url('https://cdn.shopify.com/s/files/1/0594/4338/0358/files/alias-bold.otf?v=1768319691') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Sans';
+  src: url('https://cdn.shopify.com/s/files/1/0594/4338/0358/files/DMSans-VariableFont_opsz_wght.ttf?v=1774824355') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('https://cdn.shopify.com/s/files/1/0594/4338/0358/files/IBMPlexMono-Light.ttf?v=1774824477') format('truetype');
+  font-weight: 300;
+  font-display: swap;
+}
+
+:root {
+  --background: #F2F0EC; /* bone */
+  --foreground: #0D0D0D; /* carbon */
+  --card: #FFFFFF;
+  --card-foreground: #0D0D0D;
+  --popover: #FFFFFF;
+  --popover-foreground: #0D0D0D;
+  --primary: #0D0D0D;
+  --primary-foreground: #F2F0EC;
+  --secondary: #F2F0EC;
+  --secondary-foreground: #0D0D0D;
+  --muted: #F2F0EC;
+  --muted-foreground: #6B6B6B;
+  --accent: #D4541A;
+  --accent-foreground: #FFFFFF;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #E5E2DC;
+  --input: #E5E2DC;
+  --ring: #D4541A;
+  --radius: 0.5rem;
+  --sidebar: #0D0D0D;
+  --sidebar-foreground: #F2F0EC;
+  --sidebar-primary: #D4541A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1A1A1A;
+  --sidebar-accent-foreground: #F2F0EC;
+  --sidebar-border: #2A2A2A;
+  --sidebar-ring: #D4541A;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  html {
+    @apply antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Alias Extended', 'DM Sans', sans-serif;
+    letter-spacing: -0.01em;
+  }
 }
