@@ -9,10 +9,12 @@ RUN npm ci
 # Builder
 FROM base AS builder
 WORKDIR /app
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN echo "Building $GIT_SHA" && npm run build && ls -la /app/.next/standalone/ | head -5
 
 # Runner
 FROM base AS runner
