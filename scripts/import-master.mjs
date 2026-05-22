@@ -213,14 +213,17 @@ async function main() {
       tags,
     };
 
+    // Dedup: se tem CNPJ, usa SÓ CNPJ (cada CNPJ é uma conta única)
+    // Só faz fallback por nome quando CNPJ está vazio
     const cnpjKey = cnpjRaw || "";
     const nomeKey = normNome(nome);
     const rsKey = rs ? normNome(rs) : "";
-    const existeId =
-      (cnpjKey && porCnpj.get(cnpjKey)) ||
-      porNome.get(nomeKey) ||
-      (rsKey && porNome.get(rsKey)) ||
-      null;
+    let existeId = null;
+    if (cnpjKey) {
+      existeId = porCnpj.get(cnpjKey) ?? null;
+    } else {
+      existeId = porNome.get(nomeKey) ?? (rsKey ? porNome.get(rsKey) : null) ?? null;
+    }
 
     let contaId = existeId;
 
