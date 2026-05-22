@@ -11,6 +11,7 @@ import { ProximaAcao } from "./_components/proxima-acao";
 import { JornadaCard } from "./_components/jornada";
 import { calcularJornada } from "@/lib/jornada";
 import { QuickActions } from "@/components/quick-actions";
+import { AdicionarContato } from "./_components/adicionar-contato";
 
 export const dynamic = "force-dynamic";
 
@@ -174,7 +175,10 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
 
         <div className="space-y-6">
           <section className="bg-white border border-[#E5E2DC] rounded-lg p-5">
-            <h2 className="font-bold mb-3 text-sm">Contatos</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-sm">Contatos</h2>
+              <AdicionarContato contaId={contaId} jaTemPrincipal={contatos.some((c) => c.ePrincipal)} />
+            </div>
             {contatos.length === 0 ? (
               <p className="text-xs text-[#6B6B6B]">Sem contatos cadastrados</p>
             ) : (

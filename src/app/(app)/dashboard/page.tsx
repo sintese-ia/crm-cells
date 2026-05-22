@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { conta, interacao, acao } from "@/db/schema";
-import { sql, count, gte, eq, and, inArray } from "drizzle-orm";
+import { conta, interacao, acao, situacao } from "@/db/schema";
+import { sql, count, gte, eq, and, inArray, asc } from "drizzle-orm";
 import { FUNIL_LABEL, FUNIL_COLOR, CANAL_LABEL } from "@/lib/labels";
 import Link from "next/link";
 
@@ -146,17 +146,54 @@ export default async function DashboardPage() {
         </section>
       </div>
 
-      <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
-        <h2 className="font-bold mb-4">Por canal</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {canalStats.map((c) => (
-            <Link key={c.canal} href={`/contas?canal=${c.canal}`} className="flex items-center justify-between hover:bg-[#F2F0EC] -mx-2 px-2 py-1 rounded text-sm">
-              <span>{CANAL_LABEL[c.canal] || c.canal}</span>
-              <span className="font-mono">{c.n}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
+          <h2 className="font-bold mb-4">Por canal</h2>
+          <div className="grid grid-cols-1 gap-1">
+            {canalStats.map((c) => (
+              <Link key={c.canal} href={`/contas?canal=${c.canal}`} className="flex items-center justify-between hover:bg-[#F2F0EC] -mx-2 px-2 py-1 rounded text-sm">
+                <span>{CANAL_LABEL[c.canal] || c.canal}</span>
+                <span className="font-mono">{c.n}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
+          <h2 className="font-bold mb-4">Distribuição por última Situação registrada</h2>
+          <SituacaoStats />
+        </section>
+      </div>
+    </div>
+  );
+}
+
+async function SituacaoStats() {
+  const stats = await db.execute(sql`
+    SELECT s.label, s.icon, s.estagio, count(distinct ult.conta_id) as n
+    FROM b2b.situacao s
+    LEFT JOIN (
+      SELECT DISTINCT ON (conta_id) conta_id, situacao_id
+      FROM b2b.interacao
+      WHERE situacao_id IS NOT NULL
+      ORDER BY conta_id, ocorrido_em DESC
+    ) ult ON ult.situacao_id = s.situacao_id
+    GROUP BY s.situacao_id, s.label, s.icon, s.estagio, s.ordem
+    HAVING count(distinct ult.conta_id) > 0
+    ORDER BY count(distinct ult.conta_id) DESC
+  `);
+  const rows = (stats as unknown as { rows?: Record<string, unknown>[] }).rows ?? (stats as unknown as Record<string, unknown>[]);
+  return (
+    <div className="space-y-1 max-h-80 overflow-auto">
+      {rows.map((r) => {
+        const row = r as { label: string; icon: string; estagio: string; n: number };
+        return (
+          <div key={row.label} className="flex items-center justify-between text-sm px-2 py-1 hover:bg-[#F2F0EC] rounded">
+            <span className="truncate">{row.icon} {row.label}</span>
+            <span className="font-mono ml-2">{row.n}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   situacao,
   regraCadencia,
   auditoria,
+  contato,
   type Conta,
 } from "@/db/schema";
 import { auth } from "@/auth";
@@ -292,6 +293,50 @@ export async function adiarAcao(
     }
     revalidatePath("/hoje");
     revalidatePath("/equipe");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function criarContato(
+  contaId: number,
+  dados: {
+    nome: string;
+    cargo?: string | null;
+    email?: string | null;
+    telefone?: string | null;
+    whatsapp?: string | null;
+    papel?: string;
+    ePrincipal?: boolean;
+  }
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "não autenticado" };
+  try {
+    // Se quer marcar como principal, primeiro tira o flag de outros (constraint UNIQUE WHERE e_principal=true)
+    if (dados.ePrincipal) {
+      await db.update(contato).set({ ePrincipal: false }).where(eq(contato.contaId, contaId));
+    }
+    await db.insert(contato).values({
+      contaId,
+      nome: dados.nome,
+      cargo: dados.cargo ?? null,
+      email: dados.email ?? null,
+      telefone: dados.telefone ?? null,
+      whatsapp: dados.whatsapp ?? null,
+      papel: dados.papel ?? "outro",
+      ePrincipal: dados.ePrincipal ?? false,
+      ativo: true,
+    });
+    await logAuditoria({
+      contaId,
+      acao: "criou_contato",
+      campo: "contato",
+      valorDepois: `${dados.nome} (${dados.cargo ?? "sem cargo"})`,
+    });
+    revalidatePath(`/contas/${contaId}`);
+    revalidatePath("/compradores");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
