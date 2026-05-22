@@ -65,10 +65,15 @@ const ORIGEM_MAP: Record<string, string> = {
 };
 
 async function fetchSheetValues(range: string) {
-  const TOKEN_PATH = `${process.env.HOME}/Documents/cells-skills-novo/4. canais/b2b/oauth-token.json`;
-  const fs = await import("fs/promises");
-  const tokenRaw = await fs.readFile(TOKEN_PATH, "utf-8");
-  const tokenJson = JSON.parse(tokenRaw);
+  let tokenJson: { client_id: string; client_secret: string; refresh_token: string };
+  if (process.env.GOOGLE_OAUTH_TOKEN_JSON) {
+    tokenJson = JSON.parse(process.env.GOOGLE_OAUTH_TOKEN_JSON);
+  } else {
+    const TOKEN_PATH = `${process.env.HOME}/Documents/cells-skills-novo/4. canais/b2b/oauth-token.json`;
+    const fs = await import("fs/promises");
+    const tokenRaw = await fs.readFile(TOKEN_PATH, "utf-8");
+    tokenJson = JSON.parse(tokenRaw);
+  }
 
   const refreshResp = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
