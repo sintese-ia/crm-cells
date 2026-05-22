@@ -10,6 +10,7 @@ import { NovaInteracao } from "./_components/nova-interacao";
 import { ProximaAcao } from "./_components/proxima-acao";
 import { JornadaCard } from "./_components/jornada";
 import { calcularJornada } from "@/lib/jornada";
+import { QuickActions } from "@/components/quick-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,29 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
   const proximaAcao = acoesPendentes[0];
   const situacoes = await db.select().from(situacao).where(eq(situacao.ativa, true)).orderBy(asc(situacao.estagio), asc(situacao.ordem));
   const audits = await db.select().from(auditoria).where(eq(auditoria.contaId, contaId)).orderBy(desc(auditoria.createdAt)).limit(50);
+
+  // Se essa conta É matriz, busca filhas
+  const filhasMatriz = await db
+    .select({
+      contaId: conta.contaId,
+      nome: conta.nome,
+      cidade: conta.cidade,
+      uf: conta.uf,
+      funilStage: conta.funilStage,
+    })
+    .from(conta)
+    .where(eq(conta.contaMatrizId, contaId))
+    .orderBy(asc(conta.cidade));
+
+  // Se essa conta é FILHA, busca matriz
+  let contaMatriz: { contaId: number; nome: string } | null = null;
+  if (c.contaMatrizId) {
+    const [m] = await db
+      .select({ contaId: conta.contaId, nome: conta.nome })
+      .from(conta)
+      .where(eq(conta.contaId, c.contaMatrizId));
+    contaMatriz = m ?? null;
+  }
 
   // mapa situacaoId → label pra mostrar nas interações
   const sitMap = Object.fromEntries(situacoes.map((s) => [s.situacaoId, s]));
@@ -156,7 +180,7 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
             ) : (
               <ul className="space-y-3">
                 {contatos.map((p) => (
-                  <li key={p.contatoId} className="text-sm">
+                  <li key={p.contatoId} className="text-sm pb-3 border-b border-[#F2F0EC] last:border-0">
                     <div className="font-medium flex items-center gap-1.5">
                       {p.nome}
                       {p.ePrincipal && (
@@ -166,6 +190,13 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
                     {p.cargo && <div className="text-xs text-[#6B6B6B]">{p.cargo}</div>}
                     {p.telefone && <div className="text-xs text-[#0D0D0D]">{p.telefone}</div>}
                     {p.email && <div className="text-xs text-[#0D0D0D]">{p.email}</div>}
+                    <div className="mt-2">
+                      <QuickActions
+                        telefone={p.telefone}
+                        whatsapp={p.whatsapp}
+                        email={p.email}
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -174,6 +205,15 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
 
           <section className="bg-white border border-[#E5E2DC] rounded-lg p-5">
             <h2 className="font-bold mb-3 text-sm">Dados institucionais</h2>
+            <div className="mb-3">
+              <QuickActions
+                telefone={c.telefoneInstitucional}
+                whatsapp={c.whatsappInstitucional}
+                email={c.emailInstitucional}
+                site={c.site}
+                size="md"
+              />
+            </div>
             <dl className="text-xs space-y-2">
               <div><dt className="text-[#6B6B6B]">Canal</dt><dd>{CANAL_LABEL[c.canal] || c.canal}</dd></div>
               <div><dt className="text-[#6B6B6B]">Cidade/UF</dt><dd>{c.cidade ? `${c.cidade}/${c.uf || "?"}` : "—"}</dd></div>
@@ -184,6 +224,38 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
               <div><dt className="text-[#6B6B6B]">Responsável</dt><dd className="capitalize">{c.responsavel}</dd></div>
             </dl>
           </section>
+
+          {/* Filhas (se for matriz) */}
+          {filhasMatriz.length > 0 && (
+            <section className="bg-white border border-[#E5E2DC] rounded-lg p-5">
+              <h2 className="font-bold mb-3 text-sm">Lojas/unidades dessa matriz ({filhasMatriz.length})</h2>
+              <ul className="space-y-1.5">
+                {filhasMatriz.map((f) => (
+                  <li key={f.contaId} className="text-xs flex items-center justify-between">
+                    <div className="min-w-0">
+                      <Link href={`/contas/${f.contaId}`} className="font-medium hover:underline truncate block">
+                        {f.nome}
+                      </Link>
+                      <span className="text-[#6B6B6B]">{f.cidade ? `${f.cidade}/${f.uf || "?"}` : "—"}</span>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded text-white ${FUNIL_COLOR[f.funilStage] || "bg-zinc-400"}`}>
+                      {FUNIL_LABEL[f.funilStage] || f.funilStage}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Se for filha — link pra matriz */}
+          {c.contaMatrizId && contaMatriz && (
+            <section className="bg-[#F2F0EC] border border-[#E5E2DC] rounded-lg p-4">
+              <div className="text-xs text-[#6B6B6B] mb-1 uppercase tracking-wider">Unidade de rede</div>
+              <Link href={`/contas/${contaMatriz.contaId}`} className="text-sm font-semibold text-[#D4541A] hover:underline">
+                ↑ {contaMatriz.nome}
+              </Link>
+            </section>
+          )}
         </div>
       </div>
     </div>

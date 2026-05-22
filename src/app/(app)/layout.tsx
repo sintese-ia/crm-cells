@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle } from "lucide-react";
 
 const NAV = [
   { href: "/equipe", label: "Equipe", icon: UsersRound },
   { href: "/contas", label: "Contas", icon: Users },
+  { href: "/compradores", label: "Compradores", icon: UserCircle },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/importar", label: "Importar", icon: Upload },

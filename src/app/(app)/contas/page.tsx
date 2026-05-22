@@ -1,9 +1,10 @@
 import { db } from "@/db";
-import { conta, CANAIS, FUNIL_STAGES, TEMPERATURAS, RESPONSAVEIS } from "@/db/schema";
+import { conta, interacao, CANAIS, FUNIL_STAGES, TEMPERATURAS, RESPONSAVEIS } from "@/db/schema";
 import { and, eq, ilike, or, sql, desc } from "drizzle-orm";
 import Link from "next/link";
-import { FUNIL_LABEL, FUNIL_COLOR, TEMP_COLOR, CANAL_LABEL } from "@/lib/labels";
+import { FUNIL_LABEL, FUNIL_COLOR, CANAL_LABEL } from "@/lib/labels";
 import { ContasFiltros } from "./_components/filtros";
+import { QuickActions } from "@/components/quick-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function ContasPage({
     resp?: string;
     temp?: string;
     uf?: string;
+    ordem?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -37,35 +39,39 @@ export default async function ContasPage({
   if (sp.uf) filters.push(eq(conta.uf, sp.uf.toUpperCase()));
 
   const where = filters.length ? and(...filters) : undefined;
+  const ordemAtual = sp.ordem || "recente";
 
-  const rows = await db
-    .select()
-    .from(conta)
-    .where(where)
-    .orderBy(desc(conta.updatedAt))
-    .limit(500);
+  // Query principal: contas + última interação (subquery)
+  const rows = await db.execute(sql`
+    SELECT c.*,
+           (SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id = c.conta_id) AS ultima_interacao_em,
+           (SELECT i.texto FROM b2b.interacao i WHERE i.conta_id = c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_interacao_texto,
+           (SELECT i.situacao_id FROM b2b.interacao i WHERE i.conta_id = c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_situacao,
+           (SELECT count(*)::int FROM b2b.interacao i WHERE i.conta_id = c.conta_id) AS total_interacoes
+    FROM b2b.conta c
+    ${where ? sql`WHERE ${where}` : sql``}
+    ORDER BY ${
+      ordemAtual === "aging"
+        ? sql`(SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id = c.conta_id) ASC NULLS FIRST`
+        : ordemAtual === "novo"
+        ? sql`c.created_at DESC`
+        : sql`c.updated_at DESC`
+    }
+    LIMIT 500
+  `);
+  const contas = (rows as unknown as { rows?: Record<string, unknown>[] }).rows ?? (rows as unknown as Record<string, unknown>[]);
 
-  const totalRow = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(conta)
-    .where(where);
+  const totalRow = await db.select({ n: sql<number>`count(*)::int` }).from(conta).where(where);
   const total = totalRow[0]?.n ?? 0;
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Contas</h1>
-          <p className="text-sm text-zinc-500">
-            {total} {total === 1 ? "conta" : "contas"} — clique pra abrir
-          </p>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Contas</h1>
+          <p className="text-sm text-[#6B6B6B]">{total} {total === 1 ? "conta" : "contas"}</p>
         </div>
-        <Link
-          href="/contas/nova"
-          className="bg-zinc-900 text-white text-sm px-4 py-2 rounded-md hover:bg-zinc-800"
-        >
-          + Nova conta
-        </Link>
+        <Link href="/contas/nova" className="bg-[#0D0D0D] text-white text-sm px-4 py-2 rounded-md hover:bg-[#1A1A1A]">+ Nova conta</Link>
       </div>
 
       <ContasFiltros
@@ -75,73 +81,102 @@ export default async function ContasPage({
         responsaveis={RESPONSAVEIS as readonly string[]}
       />
 
-      <div className="bg-white rounded-lg border overflow-hidden">
+      {/* Ordenação */}
+      <div className="bg-white border border-[#E5E2DC] rounded-lg p-3 mb-3 flex items-center gap-2">
+        <span className="text-xs text-[#6B6B6B] uppercase tracking-wider mr-1">Ordenar:</span>
+        {[
+          { v: "recente", l: "Recente" },
+          { v: "aging", l: "Parado há mais tempo ⏳" },
+          { v: "novo", l: "Criação" },
+        ].map((o) => {
+          const url = new URLSearchParams(sp as Record<string,string>);
+          url.set("ordem", o.v);
+          return (
+            <Link
+              key={o.v}
+              href={`/contas?${url}`}
+              className={`text-xs px-2 py-1 rounded border ${
+                ordemAtual === o.v ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white border-[#E5E2DC]"
+              }`}
+            >
+              {o.l}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="bg-white rounded-lg border border-[#E5E2DC] overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-zinc-50 border-b text-xs uppercase text-zinc-500">
+          <thead className="bg-[#F2F0EC] border-b border-[#E5E2DC] text-xs uppercase text-[#6B6B6B]">
             <tr>
               <th className="text-left px-4 py-3">Nome</th>
               <th className="text-left px-4 py-3">Canal</th>
               <th className="text-left px-4 py-3">Cidade/UF</th>
               <th className="text-left px-4 py-3">Funil</th>
-              <th className="text-left px-4 py-3">Temp</th>
               <th className="text-left px-4 py-3">Resp.</th>
-              <th className="text-left px-4 py-3">CNPJ</th>
+              <th className="text-left px-4 py-3">Última interação</th>
+              <th className="text-left px-4 py-3">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => (
-              <tr key={c.contaId} className="border-b hover:bg-zinc-50">
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/contas/${c.contaId}`}
-                    className="font-medium text-zinc-900 hover:underline"
-                  >
-                    {c.nome}
-                  </Link>
-                  {c.razaoSocial && c.razaoSocial !== c.nome && (
-                    <div className="text-xs text-zinc-400">{c.razaoSocial}</div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-zinc-600">
-                  {CANAL_LABEL[c.canal] || c.canal}
-                </td>
-                <td className="px-4 py-3 text-zinc-600">
-                  {c.cidade ? `${c.cidade}/${c.uf || "?"}` : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-block text-white text-xs px-2 py-0.5 rounded ${
-                      FUNIL_COLOR[c.funilStage] || "bg-zinc-400"
-                    }`}
-                  >
-                    {FUNIL_LABEL[c.funilStage] || c.funilStage}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-block w-2.5 h-2.5 rounded-full ${
-                      TEMP_COLOR[c.temperatura] || "bg-zinc-400"
-                    }`}
-                    title={c.temperatura}
-                  />
-                  <span className="ml-2 text-xs text-zinc-500">
-                    {c.temperatura}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-zinc-600 capitalize">
-                  {c.responsavel}
-                </td>
-                <td className="px-4 py-3 text-xs text-zinc-400 font-mono">
-                  {c.cnpj || "—"}
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="text-center py-12 text-zinc-500">
-                  Nenhuma conta encontrada
-                </td>
-              </tr>
+            {contas.map((c) => {
+              const row = c as Record<string, unknown> & {
+                conta_id: number; nome: string; razao_social?: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
+                telefone_institucional?: string; whatsapp_institucional?: string; cnpj?: string; conta_matriz_id?: number;
+                ultima_interacao_em?: string; ultima_interacao_texto?: string; ultima_situacao?: string; total_interacoes?: number;
+              };
+              const dias = row.ultima_interacao_em ? Math.floor((Date.now() - new Date(row.ultima_interacao_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
+              const semInteracao = !row.ultima_interacao_em;
+              const parado14 = dias !== null && dias > 14;
+              return (
+                <tr key={row.conta_id} className="border-b border-[#E5E2DC] hover:bg-[#FAFAF8]">
+                  <td className="px-4 py-3 max-w-[280px]">
+                    <Link href={`/contas/${row.conta_id}`} className="font-medium text-[#0D0D0D] hover:underline">
+                      {row.nome}
+                    </Link>
+                    {row.conta_matriz_id && (
+                      <span className="ml-2 text-[10px] text-[#0091EA] uppercase">unidade</span>
+                    )}
+                    {row.razao_social && row.razao_social !== row.nome && (
+                      <div className="text-xs text-[#6B6B6B] truncate">{row.razao_social}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-[#6B6B6B]">{CANAL_LABEL[row.canal] || row.canal}</td>
+                  <td className="px-4 py-3 text-[#6B6B6B]">{row.cidade ? `${row.cidade}/${row.uf || "?"}` : "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block text-white text-xs px-2 py-0.5 rounded ${FUNIL_COLOR[row.funil_stage] || "bg-zinc-400"}`}>
+                      {FUNIL_LABEL[row.funil_stage] || row.funil_stage}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 capitalize text-xs">{row.responsavel}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {semInteracao ? (
+                      <span className="text-[#6B6B6B]">— nunca tocado</span>
+                    ) : (
+                      <div>
+                        <div className={`font-medium ${parado14 ? "text-[#BF360C]" : "text-[#6B6B6B]"}`}>
+                          {dias === 0 ? "hoje" : `há ${dias}d`}
+                          {parado14 && <span className="ml-1">⚠️</span>}
+                        </div>
+                        {row.ultima_interacao_texto && (
+                          <div className="text-[10px] text-[#6B6B6B] truncate max-w-[200px]">
+                            {row.ultima_interacao_texto.slice(0, 50)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <QuickActions
+                      telefone={row.telefone_institucional}
+                      whatsapp={row.whatsapp_institucional}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+            {contas.length === 0 && (
+              <tr><td colSpan={7} className="text-center py-12 text-[#6B6B6B]">Nenhuma conta encontrada</td></tr>
             )}
           </tbody>
         </table>
