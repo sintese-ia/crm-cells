@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, Sun } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings } from "lucide-react";
 
 const NAV = [
-  { href: "/hoje", label: "Hoje", icon: Sun },
+  { href: "/equipe", label: "Equipe", icon: UsersRound },
   { href: "/contas", label: "Contas", icon: Users },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,6 +14,8 @@ const NAV = [
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  const role = (session.user as { role?: string }).role;
+  const isAdmin = role === "admin";
 
   return (
     <div className="min-h-screen flex bg-[#F2F0EC]">
@@ -43,10 +45,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Link>
             );
           })}
+          {isAdmin && (
+            <div className="mt-6 pt-3 border-t border-[#2A2A2A]">
+              <div className="text-[10px] text-[#6B6B6B] uppercase tracking-wider px-3 mb-1">Admin</div>
+              <Link href="/admin/cadencias" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] text-sm transition-colors">
+                <Settings className="w-4 h-4" /> Cadências
+              </Link>
+              <Link href="/admin/atividade" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] text-sm transition-colors">
+                <Users className="w-4 h-4" /> Atividade equipe
+              </Link>
+            </div>
+          )}
         </nav>
         <div className="border-t border-[#2A2A2A] pt-4">
           <div className="text-[10px] text-[#6B6B6B] uppercase tracking-wider mb-1">Logado como</div>
-          <div className="text-sm font-medium mb-3">{session.user.name}</div>
+          <div className="text-sm font-medium">{session.user.name}</div>
+          <div className="text-[10px] text-[#6B6B6B] mb-3">
+            {session.user.email}
+            {isAdmin && <span className="ml-1 text-[#D4541A]">· admin</span>}
+          </div>
           <form
             action={async () => {
               "use server";

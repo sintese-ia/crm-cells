@@ -91,6 +91,8 @@ export const interacao = b2b.table("interacao", {
   texto: text("texto").notNull(),
   anexoUrl: text("anexo_url"),
   ocorridoEm: timestamp("ocorrido_em", { withTimezone: true }).notNull().defaultNow(),
+  situacaoId: text("situacao_id"),
+  tentativaNum: bigint("tentativa_num", { mode: "number" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -175,7 +177,78 @@ export const TIPOS_ACAO = [
   "outro",
 ] as const;
 
+// ============================================================
+// b2b.situacao — lista finita de situações por interação
+// ============================================================
+export const situacao = b2b.table("situacao", {
+  situacaoId: text("situacao_id").primaryKey(),
+  label: text("label").notNull(),
+  estagio: text("estagio").notNull(),
+  autoFunil: text("auto_funil"),
+  icon: text("icon"),
+  ordem: bigint("ordem", { mode: "number" }).notNull().default(0),
+  ativa: boolean("ativa").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ============================================================
+// b2b.regra_cadencia — regras editáveis pelo admin
+// ============================================================
+export const regraCadencia = b2b.table("regra_cadencia", {
+  regraId: bigserial("regra_id", { mode: "number" }).primaryKey(),
+  estagio: text("estagio").notNull(),
+  situacaoId: text("situacao_id").references(() => situacao.situacaoId, { onDelete: "cascade" }),
+  tentativaMin: bigint("tentativa_min", { mode: "number" }).notNull().default(1),
+  tentativaMax: bigint("tentativa_max", { mode: "number" }),
+  diasProximaAcao: bigint("dias_proxima_acao", { mode: "number" }),
+  tipoProximaAcao: text("tipo_proxima_acao").notNull().default("follow_up"),
+  descricaoAcao: text("descricao_acao").notNull(),
+  moveFunilPara: text("move_funil_para"),
+  ativa: boolean("ativa").notNull().default(true),
+  ordem: bigint("ordem", { mode: "number" }).notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ============================================================
+// b2b.auditoria_conta — log de mudanças
+// ============================================================
+export const auditoria = b2b.table("auditoria_conta", {
+  auditoriaId: bigserial("auditoria_id", { mode: "number" }).primaryKey(),
+  contaId: bigint("conta_id", { mode: "number" })
+    .notNull()
+    .references(() => conta.contaId, { onDelete: "cascade" }),
+  usuarioId: text("usuario_id").notNull(),
+  usuarioEmail: text("usuario_email").notNull(),
+  usuarioNome: text("usuario_nome").notNull(),
+  acao: text("acao").notNull(),
+  campo: text("campo"),
+  valorAntes: text("valor_antes"),
+  valorDepois: text("valor_depois"),
+  contexto: text("contexto"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const ESTAGIOS_JORNADA = [
+  "primeiro_contato",
+  "reuniao_marcada",
+  "pos_reuniao",
+  "cliente_ativo",
+  "parado",
+] as const;
+
+export const ESTAGIO_LABEL: Record<string, string> = {
+  primeiro_contato: "Primeiro contato",
+  reuniao_marcada: "Reunião marcada",
+  pos_reuniao: "Pós-reunião",
+  cliente_ativo: "Cliente ativo",
+  parado: "Parado / exceções",
+};
+
 export type Conta = typeof conta.$inferSelect;
 export type Contato = typeof contato.$inferSelect;
 export type Interacao = typeof interacao.$inferSelect;
 export type Acao = typeof acao.$inferSelect;
+export type Situacao = typeof situacao.$inferSelect;
+export type RegraCadencia = typeof regraCadencia.$inferSelect;
+export type Auditoria = typeof auditoria.$inferSelect;
