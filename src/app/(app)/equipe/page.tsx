@@ -69,6 +69,7 @@ async function pegarFrios(pessoa: string) {
       FROM b2b.conta c
       WHERE c.responsavel = ${pessoa}
         AND c.funil_stage = 'base_fria'
+        AND c.conta_matriz_id IS NULL  -- exclui filhas de rede (operação centraliza na matriz)
         AND NOT EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id)
     )
     SELECT r.conta_id, r.nome, r.cidade, r.uf, r.cnpj,

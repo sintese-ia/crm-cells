@@ -19,9 +19,11 @@ export default async function ContasPage({
     temp?: string;
     uf?: string;
     ordem?: string;
+    incluirFilhas?: string;
   }>;
 }) {
   const sp = await searchParams;
+  const incluirFilhas = sp.incluirFilhas === "true";
   const filters = [];
   if (sp.busca)
     filters.push(
@@ -37,6 +39,13 @@ export default async function ContasPage({
   if (sp.resp) filters.push(eq(conta.responsavel, sp.resp));
   if (sp.temp) filters.push(eq(conta.temperatura, sp.temp));
   if (sp.uf) filters.push(eq(conta.uf, sp.uf.toUpperCase()));
+  // Default: esconde filhas (mostra matrizes + contas independentes)
+  // Exceção: filha aparece se já foi tocada (interação ou funil avançado)
+  if (!incluirFilhas) {
+    filters.push(
+      sql`(${conta.contaMatrizId} IS NULL OR ${conta.funilStage} != 'base_fria' OR EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = ${conta.contaId}))`
+    );
+  }
 
   const where = filters.length ? and(...filters) : undefined;
   const ordemAtual = sp.ordem || "recente";
@@ -81,8 +90,8 @@ export default async function ContasPage({
         responsaveis={RESPONSAVEIS as readonly string[]}
       />
 
-      {/* Ordenação */}
-      <div className="bg-white border border-[#E5E2DC] rounded-lg p-3 mb-3 flex items-center gap-2">
+      {/* Ordenação + toggle filhas */}
+      <div className="bg-white border border-[#E5E2DC] rounded-lg p-3 mb-3 flex items-center gap-2 flex-wrap">
         <span className="text-xs text-[#6B6B6B] uppercase tracking-wider mr-1">Ordenar:</span>
         {[
           { v: "recente", l: "Recente" },
@@ -103,6 +112,16 @@ export default async function ContasPage({
             </Link>
           );
         })}
+        <span className="text-[#E5E2DC] mx-1">|</span>
+        {(() => {
+          const url = new URLSearchParams(sp as Record<string,string>);
+          if (incluirFilhas) url.delete("incluirFilhas"); else url.set("incluirFilhas", "true");
+          return (
+            <Link href={`/contas?${url}`} className={`text-xs px-2 py-1 rounded border ${incluirFilhas ? "bg-[#D4541A] text-white border-[#D4541A]" : "bg-white border-[#E5E2DC]"}`}>
+              {incluirFilhas ? "🏢 incluindo filhas de rede" : "🏢 ocultando filhas de rede"}
+            </Link>
+          );
+        })()}
       </div>
 
       {/* Mobile: lista de cards */}
