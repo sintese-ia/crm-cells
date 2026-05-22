@@ -98,9 +98,9 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
     for (const p of PESSOAS) acoesPorPessoa[p.id] = await pegarAcoesAteSeteDias(p.id);
 
     return (
-      <div className="p-8 max-w-[1500px] mx-auto">
+      <div className="p-4 lg:p-8 max-w-[1500px] mx-auto">
         <Header ativa="todos" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PESSOAS.map((p) => {
             const acoes = acoesPorPessoa[p.id];
             const atrasadas = acoes.filter((a) => a.dataPrevista < hoje);
@@ -166,10 +166,10 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 lg:p-8 max-w-5xl mx-auto">
       <Header ativa={ativa} totalAcoes={todasAcoes.length} totalFrios={friosRows.length} />
 
-      <div className="grid grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 mb-6 lg:mb-8">
         <StatCard label="📞 Ligações 7d" valor={ligacoesSemana[0]?.n ?? 0} />
         <StatCard label="📅 Reuniões marcadas" valor={reuMarcadas[0]?.n ?? 0} />
         <StatCard label="🤝 Em negociação" valor={emNeg[0]?.n ?? 0} />
@@ -305,25 +305,25 @@ function MiniGrupo({ label, cor, acoes, hoje }: { label: string; cor: string; ac
 
 function Header({ ativa, totalAcoes, totalFrios }: { ativa: string; totalAcoes?: number; totalFrios?: number }) {
   return (
-    <div className="flex items-end justify-between mb-6">
+    <div className="flex flex-col gap-3 mb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
+        <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
           {ativa === "todos" ? "Próximas ações da equipe" : "Próximas ações"}
         </h1>
         <p className="text-sm text-[#6B6B6B]">
           {ativa === "todos"
-            ? "Visão consolidada — o que cada um tem pra fazer (hoje e próximos 7d)"
+            ? "O que cada um tem pra fazer hoje e nos próximos 7d"
             : totalAcoes !== undefined
-            ? `${totalAcoes} ações nos próximos 7 dias · ${totalFrios} frios pra primeiro contato`
+            ? `${totalAcoes} ações em 7 dias · ${totalFrios} frios`
             : ""}
         </p>
       </div>
-      <div className="flex gap-1">
-        <Link href="/equipe?p=todos" className={`px-3 py-1.5 text-sm rounded-md border ${ativa === "todos" ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white text-[#0D0D0D] border-[#E5E2DC] hover:bg-[#F2F0EC]"}`}>
+      <div className="flex gap-1 overflow-x-auto -mx-1 px-1 pb-1">
+        <Link href="/equipe?p=todos" className={`shrink-0 px-3 py-2 text-sm rounded-md border ${ativa === "todos" ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white text-[#0D0D0D] border-[#E5E2DC] hover:bg-[#F2F0EC]"}`}>
           👥 Todos
         </Link>
         {PESSOAS.map((p) => (
-          <Link key={p.id} href={`/equipe?p=${p.id}`} className={`px-4 py-2 text-sm rounded-md border ${ativa === p.id ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white text-[#0D0D0D] border-[#E5E2DC] hover:bg-[#F2F0EC]"}`}>
+          <Link key={p.id} href={`/equipe?p=${p.id}`} className={`shrink-0 px-4 py-2 text-sm rounded-md border ${ativa === p.id ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white text-[#0D0D0D] border-[#E5E2DC] hover:bg-[#F2F0EC]"}`}>
             {p.label}
           </Link>
         ))}

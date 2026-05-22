@@ -36,8 +36,8 @@ export default async function PipelinePage({
   }
 
   return (
-    <div className="p-6 h-screen flex flex-col">
-      <div className="flex items-end justify-between mb-4">
+    <div className="p-4 lg:p-6 h-screen flex flex-col">
+      <div className="flex flex-col gap-3 mb-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
             Pipeline
@@ -46,7 +46,7 @@ export default async function PipelinePage({
             {contas.length} contas {respAtivo !== "todos" ? `de ${respAtivo}` : "no total"} · arraste cards entre colunas
           </p>
         </div>
-        <div className="flex gap-1 items-center">
+        <div className="flex gap-1 items-center overflow-x-auto -mx-1 px-1 pb-1">
           <Link
             href={`/pipeline?${respAtivo!=="todos"?`resp=${respAtivo}&`:""}${apenasMatrizes ? "" : "modo=matriz"}`}
             className={`text-xs px-2 py-1 rounded border ${apenasMatrizes ? "bg-[#D4541A] text-white border-[#D4541A]" : "bg-white border-[#E5E2DC]"}`}

@@ -44,9 +44,9 @@ export default async function CompradoresPage({
   const total = (totalRowVal[0]?.n as number) ?? 0;
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Compradores</h1>
+    <div className="p-4 lg:p-8 max-w-[1400px] mx-auto">
+      <div className="mb-4 lg:mb-6">
+        <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Compradores</h1>
         <p className="text-sm text-[#6B6B6B]">{total} pessoas cadastradas</p>
       </div>
 
@@ -72,7 +72,32 @@ export default async function CompradoresPage({
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-[#E5E2DC] overflow-hidden">
+      {/* Mobile: cards */}
+      <div className="lg:hidden space-y-2">
+        {rows.map((r) => {
+          const row = r as Record<string, unknown> & {
+            contato_id: number; contato_nome: string; cargo?: string; email?: string; telefone?: string; whatsapp?: string;
+            e_principal: boolean; conta_id: number; conta_nome: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
+          };
+          return (
+            <div key={row.contato_id} className="bg-white border border-[#E5E2DC] rounded-lg p-3">
+              <div className="font-semibold flex items-center gap-1.5">
+                {row.contato_nome}
+                {row.e_principal && <span className="text-[10px] bg-[#FFB300]/20 text-[#BF360C] px-1.5 rounded">⭐</span>}
+              </div>
+              {row.cargo && <div className="text-xs text-[#6B6B6B]">{row.cargo}</div>}
+              <Link href={`/contas/${row.conta_id}`} className="text-xs text-[#D4541A] hover:underline block mt-1 truncate">
+                {row.conta_nome}
+              </Link>
+              <div className="text-xs text-[#6B6B6B]">{row.cidade ? `${row.cidade}/${row.uf}` : "—"} · resp: {row.responsavel}</div>
+              <div className="mt-2"><QuickActions telefone={row.telefone} whatsapp={row.whatsapp} email={row.email} /></div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: tabela */}
+      <div className="hidden lg:block bg-white rounded-lg border border-[#E5E2DC] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-[#F2F0EC] border-b border-[#E5E2DC] text-xs uppercase text-[#6B6B6B]">
             <tr>

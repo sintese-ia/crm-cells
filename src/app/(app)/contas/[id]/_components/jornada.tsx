@@ -36,7 +36,7 @@ export function JornadaCard({
       <div className="text-xs uppercase tracking-wider text-[#6B6B6B] mb-2 font-medium">
         ⚡ Jornada
       </div>
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {etapas.map((e) => (
           <button
             key={e.id}

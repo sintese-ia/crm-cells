@@ -65,13 +65,13 @@ export default async function ContasPage({
   const total = totalRow[0]?.n ?? 0;
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 lg:p-8 max-w-[1400px] mx-auto">
+      <div className="flex items-center justify-between mb-4 lg:mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Contas</h1>
+          <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Contas</h1>
           <p className="text-sm text-[#6B6B6B]">{total} {total === 1 ? "conta" : "contas"}</p>
         </div>
-        <Link href="/contas/nova" className="bg-[#0D0D0D] text-white text-sm px-4 py-2 rounded-md hover:bg-[#1A1A1A]">+ Nova conta</Link>
+        <Link href="/contas/nova" className="bg-[#0D0D0D] text-white text-sm px-3 py-2 rounded-md hover:bg-[#1A1A1A]">+ Nova</Link>
       </div>
 
       <ContasFiltros
@@ -105,7 +105,37 @@ export default async function ContasPage({
         })}
       </div>
 
-      <div className="bg-white rounded-lg border border-[#E5E2DC] overflow-hidden">
+      {/* Mobile: lista de cards */}
+      <div className="lg:hidden space-y-2">
+        {contas.map((c) => {
+          const row = c as Record<string, unknown> & {
+            conta_id: number; nome: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
+            telefone_institucional?: string; whatsapp_institucional?: string; conta_matriz_id?: number;
+            ultima_interacao_em?: string; ultima_interacao_texto?: string;
+          };
+          const dias = row.ultima_interacao_em ? Math.floor((Date.now() - new Date(row.ultima_interacao_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
+          const parado14 = dias !== null && dias > 14;
+          return (
+            <div key={row.conta_id} className="bg-white border border-[#E5E2DC] rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1.5 text-xs">
+                <span className={`text-white px-2 py-0.5 rounded ${FUNIL_COLOR[row.funil_stage] || "bg-zinc-400"}`}>
+                  {FUNIL_LABEL[row.funil_stage] || row.funil_stage}
+                </span>
+                {row.conta_matriz_id && <span className="text-[10px] text-[#0091EA] uppercase">unidade</span>}
+                {parado14 && <span className="text-[#BF360C] text-[10px] font-bold">⚠️ {dias}d</span>}
+              </div>
+              <Link href={`/contas/${row.conta_id}`} className="font-semibold text-[#0D0D0D] hover:underline block">{row.nome}</Link>
+              <div className="text-xs text-[#6B6B6B] mb-2">
+                {CANAL_LABEL[row.canal] || row.canal}{row.cidade && ` · ${row.cidade}/${row.uf}`} · resp: {row.responsavel}
+              </div>
+              <QuickActions telefone={row.telefone_institucional} whatsapp={row.whatsapp_institucional} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: tabela */}
+      <div className="hidden lg:block bg-white rounded-lg border border-[#E5E2DC] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-[#F2F0EC] border-b border-[#E5E2DC] text-xs uppercase text-[#6B6B6B]">
             <tr>

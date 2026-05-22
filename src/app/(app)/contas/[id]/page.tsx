@@ -61,7 +61,7 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
   const sitMap = Object.fromEntries(situacoes.map((s) => [s.situacaoId, s]));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 lg:p-8 max-w-5xl mx-auto">
       <Link href="/contas" className="inline-flex items-center gap-1.5 text-sm text-[#6B6B6B] hover:text-[#0D0D0D] mb-4">
         <ArrowLeft className="w-4 h-4" /> voltar pras contas
       </Link>
@@ -104,8 +104,8 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
         </div>
       </header>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
           <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>

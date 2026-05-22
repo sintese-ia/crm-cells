@@ -100,10 +100,10 @@ export default async function AgendaPage({
   const hojeISO = hoje.toISOString().slice(0, 10);
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto">
-      <div className="flex items-end justify-between mb-6">
+    <div className="p-4 lg:p-8 max-w-[1400px] mx-auto">
+      <div className="flex flex-col gap-3 mb-4 lg:mb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
+          <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
             Agenda
           </h1>
           <p className="text-sm text-[#6B6B6B]">
@@ -113,14 +113,14 @@ export default async function AgendaPage({
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/agenda?mes=${fmtMes(mesPrev)}${respFiltro!=="todos"?`&resp=${respFiltro}`:""}`} className="px-3 py-1.5 text-sm rounded border border-[#E5E2DC]">←</Link>
-          <span className="text-sm font-medium capitalize min-w-[150px] text-center">
+          <span className="text-sm font-medium capitalize min-w-[140px] text-center">
             {inicio.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
           </span>
           <Link href={`/agenda?mes=${fmtMes(mesNext)}${respFiltro!=="todos"?`&resp=${respFiltro}`:""}`} className="px-3 py-1.5 text-sm rounded border border-[#E5E2DC]">→</Link>
         </div>
       </div>
 
-      <div className="flex gap-1 mb-4">
+      <div className="flex gap-1 mb-4 overflow-x-auto -mx-1 px-1 pb-1">
         {PESSOAS.map((p) => (
           <Link
             key={p.id}
@@ -136,9 +136,12 @@ export default async function AgendaPage({
       </div>
 
       <div className="bg-white border border-[#E5E2DC] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-7 bg-[#F2F0EC] text-xs uppercase tracking-wider text-[#6B6B6B] font-medium">
-          {["DOM","SEG","TER","QUA","QUI","SEX","SAB"].map((d) => (
-            <div key={d} className="px-2 py-2 text-center">{d}</div>
+        <div className="grid grid-cols-7 bg-[#F2F0EC] text-[10px] lg:text-xs uppercase tracking-wider text-[#6B6B6B] font-medium">
+          {["D","S","T","Q","Q","S","S"].map((d, i) => (
+            <div key={i} className="px-1 py-2 text-center">
+              <span className="lg:hidden">{d}</span>
+              <span className="hidden lg:inline">{["DOM","SEG","TER","QUA","QUI","SEX","SAB"][i]}</span>
+            </div>
           ))}
         </div>
         <div className="grid grid-cols-7">
@@ -149,13 +152,25 @@ export default async function AgendaPage({
             return (
               <div
                 key={c.data}
-                className={`border border-[#E5E2DC] min-h-[100px] p-2 ${c.foraMes ? "bg-[#FAFAF8] text-[#C0C0C0]" : ""} ${ehHoje ? "ring-2 ring-[#D4541A] ring-inset" : ""} ${fimSem && !c.foraMes ? "bg-[#FAFAF8]" : ""}`}
+                className={`border border-[#E5E2DC] min-h-[60px] lg:min-h-[100px] p-1 lg:p-2 ${c.foraMes ? "bg-[#FAFAF8] text-[#C0C0C0]" : ""} ${ehHoje ? "ring-2 ring-[#D4541A] ring-inset" : ""} ${fimSem && !c.foraMes ? "bg-[#FAFAF8]" : ""}`}
               >
-                <div className="text-xs font-mono mb-1 flex justify-between">
+                <div className="text-[10px] lg:text-xs font-mono mb-1 flex justify-between items-center">
                   <span className={ehHoje ? "text-[#D4541A] font-bold" : ""}>{c.dia}</span>
-                  {acoesNoDia.length > 0 && <span className="text-[#6B6B6B]">{acoesNoDia.length}</span>}
+                  {acoesNoDia.length > 0 && <span className="text-[10px] text-[#6B6B6B]">{acoesNoDia.length}</span>}
                 </div>
-                <div className="space-y-0.5">
+                {/* Mobile: só pontos coloridos */}
+                <div className="lg:hidden flex flex-wrap gap-0.5">
+                  {acoesNoDia.slice(0, 6).map((a) => (
+                    <Link
+                      key={a.acaoId}
+                      href={`/contas/${a.contaId}`}
+                      className={`block w-1.5 h-1.5 rounded-full ${CORES_RESP[a.responsavel] || "bg-zinc-400"}`}
+                      title={`${a.contaNome} · ${a.descricao}`}
+                    />
+                  ))}
+                </div>
+                {/* Desktop: cards */}
+                <div className="hidden lg:block space-y-0.5">
                   {acoesNoDia.slice(0, 4).map((a) => (
                     <Link
                       key={a.acaoId}

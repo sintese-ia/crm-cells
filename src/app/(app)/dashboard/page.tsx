@@ -55,11 +55,11 @@ export default async function DashboardPage() {
   const propostasTot = f["proposta_enviada"] ?? 0;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Dashboard</h1>
-      <p className="text-sm text-[#6B6B6B] mb-6">Visão operacional do B2B Cells</p>
+    <div className="p-4 lg:p-8 max-w-6xl mx-auto">
+      <h1 className="text-xl lg:text-2xl font-bold mb-1" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Dashboard</h1>
+      <p className="text-sm text-[#6B6B6B] mb-4 lg:mb-6">Visão operacional do B2B Cells</p>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4 mb-6 lg:mb-8">
         <Stat label="Total de contas" valor={totalContas} />
         <Stat label="Positivadas" valor={positivadosTot} cor="text-[#00897B]" />
         <Stat label="Propostas enviadas" valor={propostasTot} cor="text-[#D4541A]" />
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
         <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
           <h2 className="font-bold mb-4">Funil</h2>
           <div className="space-y-2">
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
         </section>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
         <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
           <h2 className="font-bold mb-4">Por canal</h2>
           <div className="grid grid-cols-1 gap-1">
