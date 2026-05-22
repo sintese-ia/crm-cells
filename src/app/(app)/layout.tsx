@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, Sun } from "lucide-react";
 
 const NAV = [
+  { href: "/hoje", label: "Hoje", icon: Sun },
   { href: "/contas", label: "Contas", icon: Users },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

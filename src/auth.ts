@@ -5,7 +5,6 @@ const USUARIOS = [
   { id: "gabriel", nome: "Gabriel", email: "gabriel@cells.com.br", senha: "cells2026" },
   { id: "yasmin", nome: "Yasmin", email: "yas@cells.com.br", senha: "cells2026" },
   { id: "gabi", nome: "Gabi", email: "gabi@cells.com.br", senha: "cells2026" },
-  { id: "camila", nome: "Camila", email: "camila@cells.com.br", senha: "cells2026" },
 ];
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

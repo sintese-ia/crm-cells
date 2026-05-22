@@ -8,6 +8,7 @@ export function ImportarUI() {
     novos: number;
     atualizados: number;
     pulados: number;
+    contatosCriados: number;
     erros: string[];
   } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -71,7 +72,7 @@ export function ImportarUI() {
       </button>
 
       {resultado && (
-        <div className="mt-6 grid grid-cols-3 gap-4">
+        <div className="mt-6 grid grid-cols-4 gap-4">
           <div className="border border-[#E5E2DC] rounded p-4">
             <div className="text-xs text-[#6B6B6B] mb-1 uppercase tracking-wider">
               Novos
@@ -86,6 +87,14 @@ export function ImportarUI() {
             </div>
             <div className="text-2xl font-bold text-[#D4541A]">
               {resultado.atualizados}
+            </div>
+          </div>
+          <div className="border border-[#E5E2DC] rounded p-4">
+            <div className="text-xs text-[#6B6B6B] mb-1 uppercase tracking-wider">
+              Contatos criados
+            </div>
+            <div className="text-2xl font-bold text-[#0091EA]">
+              {resultado.contatosCriados}
             </div>
           </div>
           <div className="border border-[#E5E2DC] rounded p-4">

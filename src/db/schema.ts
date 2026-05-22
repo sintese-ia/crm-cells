@@ -142,7 +142,7 @@ export const FUNIL_STAGES = [
 ] as const;
 
 export const TEMPERATURAS = ["quente", "morno", "frio", "gelado"] as const;
-export const RESPONSAVEIS = ["gabriel", "camila", "yasmin", "ismael", "lilian"] as const;
+export const RESPONSAVEIS = ["gabriel", "gabi", "yasmin", "ismael", "lilian"] as const;
 export const ORIGENS = [
   "lista_biomundo",
   "lista_mundo_verde",
