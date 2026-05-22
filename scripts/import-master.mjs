@@ -12,7 +12,11 @@ import path from "path";
 
 const DRY = process.argv.includes("--dry");
 const SHEET_ID = "1jXBvqGtCIMSoeeUBG380vHXFN8812Ma2pw2DZeCsxnc";
-const DATABASE_URL = "postgresql://claude_b2b:HUGGlvuTsBYuduJTP4RvG7rOho4ANtzt@easypanel.sinteseia.com.br:5432/dadoscells";
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error("❌ DATABASE_URL não definida. Exporta no shell ou usa: DATABASE_URL=... node scripts/import-master.mjs");
+  process.exit(1);
+}
 
 const SEGMENTO_TO_CANAL = {
   "Empório": "especializado_natural",
