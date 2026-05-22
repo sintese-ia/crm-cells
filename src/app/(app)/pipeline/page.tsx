@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { conta, FUNIL_STAGES } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and, isNull } from "drizzle-orm";
 import { KanbanBoard } from "./_components/board";
 import Link from "next/link";
 
@@ -16,12 +16,17 @@ const PESSOAS = [
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ resp?: string }>;
+  searchParams: Promise<{ resp?: string; modo?: string }>;
 }) {
   const sp = await searchParams;
   const respAtivo = PESSOAS.find((p) => p.id === sp.resp)?.id ?? "todos";
+  const apenasMatrizes = sp.modo === "matriz";
 
-  const where = respAtivo === "todos" ? undefined : eq(conta.responsavel, respAtivo);
+  const conditions = [];
+  if (respAtivo !== "todos") conditions.push(eq(conta.responsavel, respAtivo));
+  if (apenasMatrizes) conditions.push(isNull(conta.contaMatrizId));
+
+  const where = conditions.length === 0 ? undefined : conditions.length === 1 ? conditions[0] : and(...conditions);
   const contas = await db.select().from(conta).where(where).orderBy(desc(conta.updatedAt));
 
   const byStage: Record<string, typeof contas> = {};
@@ -41,11 +46,19 @@ export default async function PipelinePage({
             {contas.length} contas {respAtivo !== "todos" ? `de ${respAtivo}` : "no total"} · arraste cards entre colunas
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
+          <Link
+            href={`/pipeline?${respAtivo!=="todos"?`resp=${respAtivo}&`:""}${apenasMatrizes ? "" : "modo=matriz"}`}
+            className={`text-xs px-2 py-1 rounded border ${apenasMatrizes ? "bg-[#D4541A] text-white border-[#D4541A]" : "bg-white border-[#E5E2DC]"}`}
+            title="Mostra só matrizes (esconde filhas de rede)"
+          >
+            🏢 só matrizes
+          </Link>
+          <div className="w-px h-6 bg-[#E5E2DC] mx-1" />
           {PESSOAS.map((p) => (
             <Link
               key={p.id}
-              href={p.id === "todos" ? "/pipeline" : `/pipeline?resp=${p.id}`}
+              href={p.id === "todos" ? `/pipeline${apenasMatrizes?"?modo=matriz":""}` : `/pipeline?resp=${p.id}${apenasMatrizes?"&modo=matriz":""}`}
               className={`px-3 py-1.5 text-sm rounded-md border ${
                 respAtivo === p.id ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white text-[#0D0D0D] border-[#E5E2DC] hover:bg-[#F2F0EC]"
               }`}

@@ -299,6 +299,79 @@ export async function adiarAcao(
   }
 }
 
+export async function criarConta(dados: {
+  nome: string;
+  razaoSocial?: string | null;
+  cnpj?: string | null;
+  canal: string;
+  cidade?: string | null;
+  uf?: string | null;
+  telefone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  site?: string | null;
+  responsavel: string;
+  contato?: {
+    nome: string;
+    cargo?: string;
+    telefone?: string | null;
+    email?: string | null;
+    whatsapp?: string | null;
+  };
+}): Promise<{ ok: boolean; contaId?: number; error?: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "não autenticado" };
+  try {
+    const [inserted] = await db
+      .insert(conta)
+      .values({
+        nome: dados.nome,
+        razaoSocial: dados.razaoSocial ?? null,
+        cnpj: dados.cnpj ?? null,
+        canal: dados.canal,
+        cidade: dados.cidade ?? null,
+        uf: dados.uf ?? null,
+        telefoneInstitucional: dados.telefone ?? null,
+        whatsappInstitucional: dados.whatsapp ?? null,
+        emailInstitucional: dados.email ?? null,
+        site: dados.site ?? null,
+        responsavel: dados.responsavel,
+        funilStage: "base_fria",
+        origemLead: "prospeccao_propria",
+      })
+      .returning({ contaId: conta.contaId });
+    const contaId = inserted.contaId;
+
+    if (dados.contato?.nome) {
+      await db.insert(contato).values({
+        contaId,
+        nome: dados.contato.nome,
+        cargo: dados.contato.cargo ?? "Comprador",
+        telefone: dados.contato.telefone ?? null,
+        whatsapp: dados.contato.whatsapp ?? null,
+        email: dados.contato.email ?? null,
+        papel: "decisor",
+        relevancia: "alta",
+        ePrincipal: true,
+        ativo: true,
+      });
+    }
+
+    await logAuditoria({
+      contaId,
+      acao: "criou_conta",
+      campo: "conta",
+      valorDepois: dados.nome,
+    });
+
+    revalidatePath("/contas");
+    revalidatePath("/equipe");
+    return { ok: true, contaId };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export async function criarContato(
   contaId: number,
   dados: {
