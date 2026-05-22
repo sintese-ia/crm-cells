@@ -64,20 +64,20 @@ export default async function EquipePage({
 
   // Frios: contas dessa pessoa em base_fria SEM nenhuma interação, ordenadas por tamanho de rede
   const frios = await db.execute(sql`
-    WITH meus_frios AS (
+    WITH rede_extracted AS (
       SELECT c.conta_id, c.nome, c.cidade, c.uf, c.cnpj,
              c.telefone_institucional, c.whatsapp_institucional,
-             COALESCE(
-               (SELECT count(*)::int FROM b2b.conta c2 WHERE c2.responsavel = c.responsavel AND c2.canal = c.canal AND ${conta.tags}::text LIKE '%' || (SELECT regexp_replace(unnest, 'rede:', '') FROM unnest(c.tags) WHERE unnest LIKE 'rede:%' LIMIT 1) || '%'),
-               1
-             ) AS rede_size,
-             (SELECT regexp_replace(unnest, 'rede:', '') FROM unnest(c.tags) WHERE unnest LIKE 'rede:%' LIMIT 1) AS rede
+             (SELECT t FROM unnest(c.tags) t WHERE t LIKE 'rede:%' LIMIT 1) AS rede_tag
       FROM b2b.conta c
       WHERE c.responsavel = ${ativa}
         AND c.funil_stage = 'base_fria'
         AND NOT EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id)
     )
-    SELECT * FROM meus_frios
+    SELECT r.conta_id, r.nome, r.cidade, r.uf, r.cnpj,
+           r.telefone_institucional, r.whatsapp_institucional,
+           CASE WHEN r.rede_tag IS NOT NULL THEN replace(r.rede_tag, 'rede:', '') ELSE NULL END AS rede,
+           COALESCE((SELECT count(*)::int FROM b2b.conta c2 WHERE r.rede_tag = ANY(c2.tags)), 1) AS rede_size
+    FROM rede_extracted r
     ORDER BY rede_size DESC NULLS LAST, conta_id
     LIMIT 10
   `);
