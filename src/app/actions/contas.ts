@@ -299,6 +299,97 @@ export async function adiarAcao(
   }
 }
 
+export async function vincularMatriz(
+  filhaContaId: number,
+  matrizContaId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "não autenticado" };
+  try {
+    // Validações: matriz não pode ser ela mesma; matriz não pode ser filha
+    if (filhaContaId === matrizContaId) return { ok: false, error: "Não pode vincular a si mesma" };
+    const [matriz] = await db.select({ contaMatrizId: conta.contaMatrizId, nome: conta.nome }).from(conta).where(eq(conta.contaId, matrizContaId));
+    if (!matriz) return { ok: false, error: "Matriz não encontrada" };
+    if (matriz.contaMatrizId) return { ok: false, error: "Não pode vincular a uma filha (a candidata também é filha de outra rede)" };
+
+    const [antes] = await db.select({ contaMatrizId: conta.contaMatrizId }).from(conta).where(eq(conta.contaId, filhaContaId));
+
+    await db
+      .update(conta)
+      .set({ contaMatrizId: matrizContaId, updatedAt: new Date() })
+      .where(eq(conta.contaId, filhaContaId));
+
+    await logAuditoria({
+      contaId: filhaContaId,
+      acao: "vinculou_matriz",
+      campo: "contaMatrizId",
+      valorAntes: String(antes?.contaMatrizId ?? ""),
+      valorDepois: `${matrizContaId} (${matriz.nome})`,
+    });
+
+    revalidatePath(`/contas/${filhaContaId}`);
+    revalidatePath(`/contas/${matrizContaId}`);
+    revalidatePath("/contas");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function desvincularMatriz(
+  contaId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "não autenticado" };
+  try {
+    const [antes] = await db.select({ contaMatrizId: conta.contaMatrizId }).from(conta).where(eq(conta.contaId, contaId));
+
+    await db
+      .update(conta)
+      .set({ contaMatrizId: null, updatedAt: new Date() })
+      .where(eq(conta.contaId, contaId));
+
+    await logAuditoria({
+      contaId,
+      acao: "desvinculou_matriz",
+      campo: "contaMatrizId",
+      valorAntes: String(antes?.contaMatrizId ?? ""),
+      valorDepois: "",
+    });
+
+    revalidatePath(`/contas/${contaId}`);
+    revalidatePath("/contas");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function buscarMatrizesCandidatas(
+  query: string,
+  excluirContaId?: number
+): Promise<{ ok: boolean; matrizes: { contaId: number; nome: string; cidade: string | null; uf: string | null; filhas: number }[] }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, matrizes: [] };
+  try {
+    const q = `%${query}%`;
+    const results = await db.execute(sql`
+      SELECT c.conta_id AS "contaId", c.nome, c.cidade, c.uf,
+             (SELECT count(*)::int FROM b2b.conta f WHERE f.conta_matriz_id = c.conta_id) AS filhas
+      FROM b2b.conta c
+      WHERE c.conta_matriz_id IS NULL
+        AND (c.nome ILIKE ${q} OR c.razao_social ILIKE ${q})
+        ${excluirContaId ? sql`AND c.conta_id != ${excluirContaId}` : sql``}
+      ORDER BY filhas DESC, c.nome
+      LIMIT 20
+    `);
+    const rows = (results as unknown as { rows?: Record<string, unknown>[] }).rows ?? (results as unknown as Record<string, unknown>[]);
+    return { ok: true, matrizes: rows as { contaId: number; nome: string; cidade: string | null; uf: string | null; filhas: number }[] };
+  } catch {
+    return { ok: false, matrizes: [] };
+  }
+}
+
 export async function criarConta(dados: {
   nome: string;
   razaoSocial?: string | null;

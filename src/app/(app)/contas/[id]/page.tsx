@@ -12,6 +12,7 @@ import { JornadaCard } from "./_components/jornada";
 import { calcularJornada } from "@/lib/jornada";
 import { QuickActions } from "@/components/quick-actions";
 import { AdicionarContato } from "./_components/adicionar-contato";
+import { VincularMatriz } from "./_components/vincular-matriz";
 
 export const dynamic = "force-dynamic";
 
@@ -251,15 +252,27 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
             </section>
           )}
 
-          {/* Se for filha — link pra matriz */}
-          {c.contaMatrizId && contaMatriz && (
-            <section className="bg-[#F2F0EC] border border-[#E5E2DC] rounded-lg p-4">
-              <div className="text-xs text-[#6B6B6B] mb-1 uppercase tracking-wider">Unidade de rede</div>
-              <Link href={`/contas/${contaMatriz.contaId}`} className="text-sm font-semibold text-[#D4541A] hover:underline">
-                ↑ {contaMatriz.nome}
-              </Link>
-            </section>
-          )}
+          {/* Vínculo de matriz (visível em qualquer conta) */}
+          <section className="bg-[#F2F0EC] border border-[#E5E2DC] rounded-lg p-4">
+            <div className="text-xs text-[#6B6B6B] mb-2 uppercase tracking-wider">Rede</div>
+            {c.contaMatrizId && contaMatriz ? (
+              <div>
+                <div className="text-[10px] text-[#6B6B6B]">Esta conta é unidade da matriz:</div>
+                <Link href={`/contas/${contaMatriz.contaId}`} className="text-sm font-semibold text-[#D4541A] hover:underline">
+                  ↑ {contaMatriz.nome}
+                </Link>
+              </div>
+            ) : filhasMatriz.length > 0 ? (
+              <div className="text-xs text-[#6B6B6B]">
+                Esta é uma <strong className="text-[#D4541A]">matriz</strong> com {filhasMatriz.length} unidade(s)
+              </div>
+            ) : (
+              <div className="text-xs text-[#6B6B6B] mb-2">Conta independente (sem rede)</div>
+            )}
+            <div className="mt-2">
+              <VincularMatriz contaId={contaId} matrizAtual={contaMatriz ?? null} ehMatriz={filhasMatriz.length > 0} />
+            </div>
+          </section>
         </div>
       </div>
     </div>
