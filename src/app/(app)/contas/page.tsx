@@ -50,13 +50,15 @@ export default async function ContasPage({
   const where = filters.length ? and(...filters) : undefined;
   const ordemAtual = sp.ordem || "recente";
 
-  // Query principal: contas + última interação (subquery)
+  // Query principal: contas + última interação + n filhas (se matriz)
   const rows = await db.execute(sql`
     SELECT c.*,
            (SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id = c.conta_id) AS ultima_interacao_em,
            (SELECT i.texto FROM b2b.interacao i WHERE i.conta_id = c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_interacao_texto,
            (SELECT i.situacao_id FROM b2b.interacao i WHERE i.conta_id = c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_situacao,
-           (SELECT count(*)::int FROM b2b.interacao i WHERE i.conta_id = c.conta_id) AS total_interacoes
+           (SELECT count(*)::int FROM b2b.interacao i WHERE i.conta_id = c.conta_id) AS total_interacoes,
+           (SELECT count(*)::int FROM b2b.conta f WHERE f.conta_matriz_id = c.conta_id) AS n_filhas,
+           (SELECT count(*)::int FROM b2b.contato ct WHERE ct.conta_id = c.conta_id) AS n_contatos
     FROM b2b.conta c
     ${where ? sql`WHERE ${where}` : sql``}
     ORDER BY ${
@@ -131,16 +133,22 @@ export default async function ContasPage({
             conta_id: number; nome: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
             telefone_institucional?: string; whatsapp_institucional?: string; conta_matriz_id?: number;
             ultima_interacao_em?: string; ultima_interacao_texto?: string;
+            n_filhas?: number; n_contatos?: number;
+            tags?: string[];
           };
           const dias = row.ultima_interacao_em ? Math.floor((Date.now() - new Date(row.ultima_interacao_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
           const parado14 = dias !== null && dias > 14;
+          const ehMatriz = (row.n_filhas ?? 0) > 0;
+          const revisarContato = (row.tags || []).includes("revisar_contato");
           return (
             <div key={row.conta_id} className="bg-white border border-[#E5E2DC] rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1.5 text-xs">
+              <div className="flex items-center gap-2 mb-1.5 text-xs flex-wrap">
                 <span className={`text-white px-2 py-0.5 rounded ${FUNIL_COLOR[row.funil_stage] || "bg-zinc-400"}`}>
                   {FUNIL_LABEL[row.funil_stage] || row.funil_stage}
                 </span>
+                {ehMatriz && <span className="text-[10px] bg-[#D4541A] text-white px-1.5 rounded">🏢 matriz · {row.n_filhas} lojas</span>}
                 {row.conta_matriz_id && <span className="text-[10px] text-[#0091EA] uppercase">unidade</span>}
+                {revisarContato && <span className="text-[10px] bg-[#FFB300] text-white px-1.5 rounded">⚠️ sem comprador</span>}
                 {parado14 && <span className="text-[#BF360C] text-[10px] font-bold">⚠️ {dias}d</span>}
               </div>
               <Link href={`/contas/${row.conta_id}`} className="font-semibold text-[#0D0D0D] hover:underline block">{row.nome}</Link>
@@ -173,18 +181,27 @@ export default async function ContasPage({
                 conta_id: number; nome: string; razao_social?: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
                 telefone_institucional?: string; whatsapp_institucional?: string; cnpj?: string; conta_matriz_id?: number;
                 ultima_interacao_em?: string; ultima_interacao_texto?: string; ultima_situacao?: string; total_interacoes?: number;
+                n_filhas?: number; n_contatos?: number; tags?: string[];
               };
               const dias = row.ultima_interacao_em ? Math.floor((Date.now() - new Date(row.ultima_interacao_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
               const semInteracao = !row.ultima_interacao_em;
               const parado14 = dias !== null && dias > 14;
+              const ehMatriz = (row.n_filhas ?? 0) > 0;
+              const revisarContato = (row.tags || []).includes("revisar_contato");
               return (
                 <tr key={row.conta_id} className="border-b border-[#E5E2DC] hover:bg-[#FAFAF8]">
                   <td className="px-4 py-3 max-w-[280px]">
                     <Link href={`/contas/${row.conta_id}`} className="font-medium text-[#0D0D0D] hover:underline">
                       {row.nome}
                     </Link>
+                    {ehMatriz && (
+                      <span className="ml-2 text-[10px] bg-[#D4541A] text-white px-1.5 py-0.5 rounded">🏢 {row.n_filhas} lojas</span>
+                    )}
                     {row.conta_matriz_id && (
                       <span className="ml-2 text-[10px] text-[#0091EA] uppercase">unidade</span>
+                    )}
+                    {revisarContato && (
+                      <span className="ml-2 text-[10px] bg-[#FFB300] text-white px-1.5 py-0.5 rounded">⚠️ s/ comprador</span>
                     )}
                     {row.razao_social && row.razao_social !== row.nome && (
                       <div className="text-xs text-[#6B6B6B] truncate">{row.razao_social}</div>
