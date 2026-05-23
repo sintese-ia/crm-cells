@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FUNIL_LABEL, FUNIL_COLOR, CANAL_LABEL } from "@/lib/labels";
 import { ContasFiltros } from "./_components/filtros";
 import { QuickActions } from "@/components/quick-actions";
+import { PrioBadge } from "@/components/prio-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function ContasPage({
     uf?: string;
     ordem?: string;
     incluirFilhas?: string;
+    prio?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -39,6 +41,7 @@ export default async function ContasPage({
   if (sp.resp) filters.push(eq(conta.responsavel, sp.resp));
   if (sp.temp) filters.push(eq(conta.temperatura, sp.temp));
   if (sp.uf) filters.push(eq(conta.uf, sp.uf.toUpperCase()));
+  if (sp.prio) filters.push(sql`coalesce(${conta.prioridadeManual}, ${conta.prioridadeCalc}) = ${sp.prio}`);
   // Default: esconde filhas (mostra matrizes + contas independentes)
   // Exceção: filha aparece se já foi tocada (interação ou funil avançado)
   if (!incluirFilhas) {
@@ -66,6 +69,13 @@ export default async function ContasPage({
         ? sql`(SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id = c.conta_id) ASC NULLS FIRST`
         : ordemAtual === "novo"
         ? sql`c.created_at DESC`
+        : ordemAtual === "prio"
+        ? sql`CASE coalesce(c.prioridade_manual, c.prioridade_calc)
+             WHEN 'alta' THEN 0
+             WHEN 'media' THEN 1
+             WHEN 'baixa' THEN 2
+             WHEN 'descartar' THEN 3
+             ELSE 4 END ASC, c.updated_at DESC`
         : sql`c.updated_at DESC`
     }
     LIMIT 500
@@ -97,6 +107,7 @@ export default async function ContasPage({
         <span className="text-xs text-[#6B6B6B] uppercase tracking-wider mr-1">Ordenar:</span>
         {[
           { v: "recente", l: "Recente" },
+          { v: "prio", l: "🔥 Prioridade" },
           { v: "aging", l: "Parado há mais tempo ⏳" },
           { v: "novo", l: "Criação" },
         ].map((o) => {
@@ -143,10 +154,11 @@ export default async function ContasPage({
           return (
             <div key={row.conta_id} className="bg-white border border-[#E5E2DC] rounded-lg p-3">
               <div className="flex items-center gap-2 mb-1.5 text-xs flex-wrap">
+                <PrioBadge manual={(row as unknown as { prioridade_manual?: string }).prioridade_manual} calc={(row as unknown as { prioridade_calc?: string }).prioridade_calc} />
                 <span className={`text-white px-2 py-0.5 rounded ${FUNIL_COLOR[row.funil_stage] || "bg-zinc-400"}`}>
                   {FUNIL_LABEL[row.funil_stage] || row.funil_stage}
                 </span>
-                {ehMatriz && <span className="text-[10px] bg-[#D4541A] text-white px-1.5 rounded">🏢 matriz · {row.n_filhas} lojas</span>}
+                {ehMatriz && <span className="text-[10px] bg-[#0D0D0D] text-white px-1.5 rounded">🏢 matriz · {row.n_filhas} lojas</span>}
                 {row.conta_matriz_id && <span className="text-[10px] text-[#0091EA] uppercase">unidade</span>}
                 {revisarContato && <span className="text-[10px] bg-[#FFB300] text-white px-1.5 rounded">⚠️ sem comprador</span>}
                 {parado14 && <span className="text-[#BF360C] text-[10px] font-bold">⚠️ {dias}d</span>}
@@ -191,11 +203,14 @@ export default async function ContasPage({
               return (
                 <tr key={row.conta_id} className="border-b border-[#E5E2DC] hover:bg-[#FAFAF8]">
                   <td className="px-4 py-3 max-w-[280px]">
-                    <Link href={`/contas/${row.conta_id}`} className="font-medium text-[#0D0D0D] hover:underline">
-                      {row.nome}
-                    </Link>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <PrioBadge manual={(row as unknown as { prioridade_manual?: string }).prioridade_manual} calc={(row as unknown as { prioridade_calc?: string }).prioridade_calc} />
+                      <Link href={`/contas/${row.conta_id}`} className="font-medium text-[#0D0D0D] hover:underline">
+                        {row.nome}
+                      </Link>
+                    </div>
                     {ehMatriz && (
-                      <span className="ml-2 text-[10px] bg-[#D4541A] text-white px-1.5 py-0.5 rounded">🏢 {row.n_filhas} lojas</span>
+                      <span className="text-[10px] bg-[#0D0D0D] text-white px-1.5 py-0.5 rounded">🏢 {row.n_filhas} lojas</span>
                     )}
                     {row.conta_matriz_id && (
                       <span className="ml-2 text-[10px] text-[#0091EA] uppercase">unidade</span>

@@ -38,6 +38,13 @@ export function ContasFiltros({
         className="w-full px-3 py-2 border rounded-md text-sm bg-white"
       />
       <div className="flex flex-wrap gap-1.5 items-center">
+        <span className="text-xs text-zinc-500 mr-2">🔥 Prioridade:</span>
+        <button onClick={() => set("prio", "")} className={`text-xs px-2 py-1 rounded border ${ativo("prio", "")}`}>Todas</button>
+        <button onClick={() => set("prio", "alta")} className={`text-xs px-2 py-1 rounded border ${ativo("prio", "alta")}`}>🔥 Alta</button>
+        <button onClick={() => set("prio", "media")} className={`text-xs px-2 py-1 rounded border ${ativo("prio", "media")}`}>🟠 Média</button>
+        <button onClick={() => set("prio", "baixa")} className={`text-xs px-2 py-1 rounded border ${ativo("prio", "baixa")}`}>⚪ Baixa</button>
+      </div>
+      <div className="flex flex-wrap gap-1.5 items-center">
         <span className="text-xs text-zinc-500 mr-2">Funil:</span>
         <button
           onClick={() => set("funil", "")}

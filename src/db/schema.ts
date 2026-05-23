@@ -45,6 +45,8 @@ export const conta = b2b.table("conta", {
   funilStage: text("funil_stage").notNull().default("base_fria"),
   temperatura: text("temperatura").notNull().default("frio"),
   motivoPerda: text("motivo_perda"),
+  prioridadeCalc: text("prioridade_calc"),
+  prioridadeManual: text("prioridade_manual"),
   tags: text("tags").array().default(sql`'{}'::text[]`),
   notas: text("notas"),
   clickupTaskId: text("clickup_task_id").unique(),

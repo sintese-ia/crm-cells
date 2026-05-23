@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FUNIL_COLOR, FUNIL_LABEL } from "@/lib/labels";
 import { ProximaAcaoMiniBtns } from "./_components/mini-btns";
 import { QuickActions } from "@/components/quick-actions";
+import { PrioBadge } from "@/components/prio-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -61,23 +62,30 @@ async function pegarAcoesAteSeteDias(pessoa: string): Promise<DataAcao[]> {
 }
 
 async function pegarFrios(pessoa: string) {
+  // Ordena: prioridade alta primeiro, depois tamanho da rede
   const frios = await db.execute(sql`
     WITH rede_extracted AS (
       SELECT c.conta_id, c.nome, c.cidade, c.uf, c.cnpj,
              c.telefone_institucional, c.whatsapp_institucional,
+             c.prioridade_calc, c.prioridade_manual,
              (SELECT t FROM unnest(c.tags) t WHERE t LIKE 'rede:%' LIMIT 1) AS rede_tag
       FROM b2b.conta c
       WHERE c.responsavel = ${pessoa}
         AND c.funil_stage = 'base_fria'
-        AND c.conta_matriz_id IS NULL  -- exclui filhas de rede (operação centraliza na matriz)
+        AND c.conta_matriz_id IS NULL
+        AND coalesce(c.prioridade_manual, c.prioridade_calc) != 'descartar'
         AND NOT EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id)
     )
     SELECT r.conta_id, r.nome, r.cidade, r.uf, r.cnpj,
            r.telefone_institucional, r.whatsapp_institucional,
+           r.prioridade_calc, r.prioridade_manual,
            CASE WHEN r.rede_tag IS NOT NULL THEN replace(r.rede_tag, 'rede:', '') ELSE NULL END AS rede,
            COALESCE((SELECT count(*)::int FROM b2b.conta c2 WHERE r.rede_tag = ANY(c2.tags)), 1) AS rede_size
     FROM rede_extracted r
-    ORDER BY rede_size DESC NULLS LAST, conta_id
+    ORDER BY
+      CASE coalesce(r.prioridade_manual, r.prioridade_calc)
+        WHEN 'alta' THEN 0 WHEN 'media' THEN 1 WHEN 'baixa' THEN 2 ELSE 3 END ASC,
+      rede_size DESC NULLS LAST, conta_id
     LIMIT 10
   `);
   return (frios as unknown as { rows?: Record<string, unknown>[] }).rows ?? (frios as unknown as Record<string, unknown>[]);
@@ -225,11 +233,12 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
         ) : (
           <div className="space-y-2">
             {friosRows.map((f) => {
-              const row = f as { conta_id: number; nome: string; cidade?: string; uf?: string; cnpj?: string; telefone_institucional?: string; whatsapp_institucional?: string; rede?: string; rede_size?: number };
+              const row = f as { conta_id: number; nome: string; cidade?: string; uf?: string; cnpj?: string; telefone_institucional?: string; whatsapp_institucional?: string; rede?: string; rede_size?: number; prioridade_calc?: string; prioridade_manual?: string };
               return (
                 <div key={row.conta_id} className="bg-white border border-[#E5E2DC] rounded-lg p-4 flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 text-xs">
+                    <div className="flex items-center gap-2 mb-1 text-xs flex-wrap">
+                      <PrioBadge manual={row.prioridade_manual} calc={row.prioridade_calc} />
                       <span className="text-white px-2 py-0.5 rounded bg-[#6B6B6B]">Base fria</span>
                       {row.rede && <span className="text-xs bg-[#F2F0EC] px-2 py-0.5 rounded">🏷️ {row.rede} ({row.rede_size} lojas)</span>}
                     </div>
