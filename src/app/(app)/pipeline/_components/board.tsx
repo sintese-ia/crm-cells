@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { moverFunil } from "@/app/actions/contas";
 import { FUNIL_LABEL, FUNIL_COLOR, TEMP_COLOR } from "@/lib/labels";
 import type { Conta } from "@/db/schema";
@@ -14,6 +14,11 @@ export function KanbanBoard({
   stages: readonly string[];
 }) {
   const [byStage, setByStage] = useState(initialByStage);
+  // Quando troca filtro (resp/modo) o parent passa novo initialByStage;
+  // re-sincroniza o state local pra refletir o novo conjunto de contas.
+  useEffect(() => {
+    setByStage(initialByStage);
+  }, [initialByStage]);
   const [dragging, setDragging] = useState<number | null>(null);
   const [, startTransition] = useTransition();
 
