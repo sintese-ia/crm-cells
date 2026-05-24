@@ -14,7 +14,7 @@ import { toast } from "sonner";
 export function EditarConta({ conta }: { conta: Conta }) {
   const [isPending, startTransition] = useTransition();
 
-  const update = (campo: keyof Conta, valor: string) => {
+  const update = (campo: keyof Conta, valor: string | null) => {
     startTransition(async () => {
       const r = await atualizarConta(conta.contaId, { [campo]: valor });
       if (r.ok) toast.success(`${campo} atualizado`);
@@ -72,11 +72,12 @@ export function EditarConta({ conta }: { conta: Conta }) {
       <div>
         <label className="text-xs text-zinc-500">Responsável</label>
         <select
-          defaultValue={conta.responsavel}
-          onChange={(e) => update("responsavel", e.target.value)}
+          defaultValue={conta.responsavel ?? ""}
+          onChange={(e) => update("responsavel", e.target.value || null)}
           disabled={isPending}
           className="w-full px-2 py-1.5 border rounded text-sm bg-white"
         >
+          <option value="">— sem responsável</option>
           {RESPONSAVEIS.map((r) => (
             <option key={r} value={r}>
               {r}

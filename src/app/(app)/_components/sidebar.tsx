@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck } from "lucide-react";
 
 const NAV = [
   { href: "/equipe", label: "Equipe", icon: UsersRound },
@@ -9,6 +9,7 @@ const NAV = [
   { href: "/contas", label: "Contas", icon: Users },
   { href: "/compradores", label: "Compradores", icon: UserCircle },
   { href: "/pipeline", label: "Pipeline", icon: Kanban },
+  { href: "/homologacoes", label: "Homologações", icon: ShieldCheck },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/importar", label: "Importar", icon: Upload },
 ];

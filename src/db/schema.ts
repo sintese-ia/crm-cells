@@ -41,13 +41,18 @@ export const conta = b2b.table("conta", {
   volumeEstimadoMensalBrl: numeric("volume_estimado_mensal_brl"),
   origemLead: text("origem_lead").notNull().default("prospeccao_propria"),
   origemLeadDetalhe: text("origem_lead_detalhe"),
-  responsavel: text("responsavel").notNull().default("gabriel"),
+  responsavel: text("responsavel").default("gabriel"),
   funilStage: text("funil_stage").notNull().default("base_fria"),
   temperatura: text("temperatura").notNull().default("frio"),
   motivoPerda: text("motivo_perda"),
   prioridadeCalc: text("prioridade_calc"),
   prioridadeManual: text("prioridade_manual"),
   tags: text("tags").array().default(sql`'{}'::text[]`),
+  requerHomologacao: boolean("requer_homologacao").notNull().default(false),
+  statusHomologacao: text("status_homologacao"),
+  homologacaoIniciadaEm: date("homologacao_iniciada_em"),
+  homologacaoAprovadaEm: date("homologacao_aprovada_em"),
+  homologacaoNotas: text("homologacao_notas"),
   notas: text("notas"),
   clickupTaskId: text("clickup_task_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -230,6 +235,22 @@ export const auditoria = b2b.table("auditoria_conta", {
   contexto: text("contexto"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const STATUS_HOMOLOGACAO = [
+  "pendente_inicio",
+  "docs_enviados",
+  "em_analise",
+  "aprovada",
+  "reprovada",
+] as const;
+
+export const STATUS_HOMOLOGACAO_LABEL: Record<string, string> = {
+  pendente_inicio: "Pendente — iniciar",
+  docs_enviados: "Docs enviados",
+  em_analise: "Em análise",
+  aprovada: "Aprovada",
+  reprovada: "Reprovada",
+};
 
 export const ESTAGIOS_JORNADA = [
   "primeiro_contato",

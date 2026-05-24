@@ -13,6 +13,7 @@ import { calcularJornada } from "@/lib/jornada";
 import { QuickActions } from "@/components/quick-actions";
 import { AdicionarContato } from "./_components/adicionar-contato";
 import { VincularMatriz } from "./_components/vincular-matriz";
+import { HomologacaoCard } from "./_components/homologacao";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,17 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
         />
 
         {proximaAcao && <ProximaAcao acao={proximaAcao} />}
+
+        <div className="mt-4">
+          <HomologacaoCard
+            contaId={contaId}
+            requer={c.requerHomologacao}
+            status={c.statusHomologacao}
+            iniciadaEm={c.homologacaoIniciadaEm}
+            aprovadaEm={c.homologacaoAprovadaEm}
+            notas={c.homologacaoNotas}
+          />
+        </div>
 
         <div className="mt-4">
           <EditarConta conta={c} />
@@ -226,7 +238,7 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
               <div><dt className="text-[#6B6B6B]">Telefone</dt><dd>{c.telefoneInstitucional || "—"}</dd></div>
               <div><dt className="text-[#6B6B6B]">Site</dt><dd>{c.site || "—"}</dd></div>
               <div><dt className="text-[#6B6B6B]">Origem</dt><dd>{c.origemLead}</dd></div>
-              <div><dt className="text-[#6B6B6B]">Responsável</dt><dd className="capitalize">{c.responsavel}</dd></div>
+              <div><dt className="text-[#6B6B6B]">Responsável</dt><dd className="capitalize">{c.responsavel || <span className="text-[#6B6B6B] italic">— sem responsável</span>}</dd></div>
             </dl>
           </section>
 

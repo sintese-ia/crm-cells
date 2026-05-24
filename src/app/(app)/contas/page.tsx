@@ -1,11 +1,12 @@
 import { db } from "@/db";
 import { conta, interacao, CANAIS, FUNIL_STAGES, TEMPERATURAS, RESPONSAVEIS } from "@/db/schema";
-import { and, eq, ilike, or, sql, desc } from "drizzle-orm";
+import { and, eq, ilike, or, sql, desc, isNull, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { FUNIL_LABEL, FUNIL_COLOR, CANAL_LABEL } from "@/lib/labels";
 import { ContasFiltros } from "./_components/filtros";
 import { QuickActions } from "@/components/quick-actions";
 import { PrioBadge } from "@/components/prio-badge";
+import { HomologacaoBadge } from "@/components/homologacao-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function ContasPage({
     ordem?: string;
     incluirFilhas?: string;
     prio?: string;
+    homologacao?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -38,10 +40,19 @@ export default async function ContasPage({
     );
   if (sp.canal) filters.push(eq(conta.canal, sp.canal));
   if (sp.funil) filters.push(eq(conta.funilStage, sp.funil));
-  if (sp.resp) filters.push(eq(conta.responsavel, sp.resp));
+  if (sp.resp === "__sem__") filters.push(isNull(conta.responsavel));
+  else if (sp.resp) filters.push(eq(conta.responsavel, sp.resp));
   if (sp.temp) filters.push(eq(conta.temperatura, sp.temp));
   if (sp.uf) filters.push(eq(conta.uf, sp.uf.toUpperCase()));
   if (sp.prio) filters.push(sql`coalesce(${conta.prioridadeManual}, ${conta.prioridadeCalc}) = ${sp.prio}`);
+  if (sp.homologacao === "pendente")
+    filters.push(sql`${conta.requerHomologacao} = true AND ${conta.statusHomologacao} IN ('pendente_inicio','docs_enviados','em_analise')`);
+  else if (sp.homologacao === "aprovada")
+    filters.push(sql`${conta.requerHomologacao} = true AND ${conta.statusHomologacao} = 'aprovada'`);
+  else if (sp.homologacao === "reprovada")
+    filters.push(sql`${conta.requerHomologacao} = true AND ${conta.statusHomologacao} = 'reprovada'`);
+  else if (sp.homologacao === "nao_aplica")
+    filters.push(eq(conta.requerHomologacao, false));
   // Default: esconde filhas (mostra matrizes + contas independentes)
   // Exceção: filha aparece se já foi tocada (interação ou funil avançado)
   if (!incluirFilhas) {
@@ -141,11 +152,12 @@ export default async function ContasPage({
       <div className="lg:hidden space-y-2">
         {contas.map((c) => {
           const row = c as Record<string, unknown> & {
-            conta_id: number; nome: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
+            conta_id: number; nome: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string | null;
             telefone_institucional?: string; whatsapp_institucional?: string; conta_matriz_id?: number;
             ultima_interacao_em?: string; ultima_interacao_texto?: string;
             n_filhas?: number; n_contatos?: number;
             tags?: string[];
+            requer_homologacao?: boolean; status_homologacao?: string | null;
           };
           const dias = row.ultima_interacao_em ? Math.floor((Date.now() - new Date(row.ultima_interacao_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
           const parado14 = dias !== null && dias > 14;
@@ -161,11 +173,12 @@ export default async function ContasPage({
                 {ehMatriz && <span className="text-[10px] bg-[#0D0D0D] text-white px-1.5 rounded">🏢 matriz · {row.n_filhas} lojas</span>}
                 {row.conta_matriz_id && <span className="text-[10px] text-[#0091EA] uppercase">unidade</span>}
                 {revisarContato && <span className="text-[10px] bg-[#FFB300] text-white px-1.5 rounded">⚠️ sem comprador</span>}
+                <HomologacaoBadge requer={Boolean(row.requer_homologacao)} status={row.status_homologacao} />
                 {parado14 && <span className="text-[#BF360C] text-[10px] font-bold">⚠️ {dias}d</span>}
               </div>
               <Link href={`/contas/${row.conta_id}`} className="font-semibold text-[#0D0D0D] hover:underline block">{row.nome}</Link>
               <div className="text-xs text-[#6B6B6B] mb-2">
-                {CANAL_LABEL[row.canal] || row.canal}{row.cidade && ` · ${row.cidade}/${row.uf}`} · resp: {row.responsavel}
+                {CANAL_LABEL[row.canal] || row.canal}{row.cidade && ` · ${row.cidade}/${row.uf}`} · resp: {row.responsavel || "—"}
               </div>
               <QuickActions telefone={row.telefone_institucional} whatsapp={row.whatsapp_institucional} />
             </div>
@@ -190,10 +203,11 @@ export default async function ContasPage({
           <tbody>
             {contas.map((c) => {
               const row = c as Record<string, unknown> & {
-                conta_id: number; nome: string; razao_social?: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string;
+                conta_id: number; nome: string; razao_social?: string; canal: string; cidade?: string; uf?: string; funil_stage: string; responsavel: string | null;
                 telefone_institucional?: string; whatsapp_institucional?: string; cnpj?: string; conta_matriz_id?: number;
                 ultima_interacao_em?: string; ultima_interacao_texto?: string; ultima_situacao?: string; total_interacoes?: number;
                 n_filhas?: number; n_contatos?: number; tags?: string[];
+                requer_homologacao?: boolean; status_homologacao?: string | null;
               };
               const dias = row.ultima_interacao_em ? Math.floor((Date.now() - new Date(row.ultima_interacao_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
               const semInteracao = !row.ultima_interacao_em;
@@ -218,6 +232,9 @@ export default async function ContasPage({
                     {revisarContato && (
                       <span className="ml-2 text-[10px] bg-[#FFB300] text-white px-1.5 py-0.5 rounded">⚠️ s/ comprador</span>
                     )}
+                    <span className="ml-2">
+                      <HomologacaoBadge requer={Boolean(row.requer_homologacao)} status={row.status_homologacao} size="md" />
+                    </span>
                     {row.razao_social && row.razao_social !== row.nome && (
                       <div className="text-xs text-[#6B6B6B] truncate">{row.razao_social}</div>
                     )}
@@ -229,7 +246,7 @@ export default async function ContasPage({
                       {FUNIL_LABEL[row.funil_stage] || row.funil_stage}
                     </span>
                   </td>
-                  <td className="px-4 py-3 capitalize text-xs">{row.responsavel}</td>
+                  <td className="px-4 py-3 capitalize text-xs">{row.responsavel || <span className="text-[#6B6B6B]">—</span>}</td>
                   <td className="px-4 py-3 text-xs">
                     {semInteracao ? (
                       <span className="text-[#6B6B6B]">— nunca tocado</span>

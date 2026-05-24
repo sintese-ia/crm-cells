@@ -45,6 +45,14 @@ export function ContasFiltros({
         <button onClick={() => set("prio", "baixa")} className={`text-xs px-2 py-1 rounded border ${ativo("prio", "baixa")}`}>⚪ Baixa</button>
       </div>
       <div className="flex flex-wrap gap-1.5 items-center">
+        <span className="text-xs text-zinc-500 mr-2">🛂 Homologação:</span>
+        <button onClick={() => set("homologacao", "")} className={`text-xs px-2 py-1 rounded border ${ativo("homologacao", "")}`}>Todas</button>
+        <button onClick={() => set("homologacao", "pendente")} className={`text-xs px-2 py-1 rounded border ${ativo("homologacao", "pendente")}`}>🔒 Pendente/em curso</button>
+        <button onClick={() => set("homologacao", "aprovada")} className={`text-xs px-2 py-1 rounded border ${ativo("homologacao", "aprovada")}`}>✅ Aprovada</button>
+        <button onClick={() => set("homologacao", "reprovada")} className={`text-xs px-2 py-1 rounded border ${ativo("homologacao", "reprovada")}`}>🚫 Reprovada</button>
+        <button onClick={() => set("homologacao", "nao_aplica")} className={`text-xs px-2 py-1 rounded border ${ativo("homologacao", "nao_aplica")}`}>— N/A</button>
+      </div>
+      <div className="flex flex-wrap gap-1.5 items-center">
         <span className="text-xs text-zinc-500 mr-2">Funil:</span>
         <button
           onClick={() => set("funil", "")}
@@ -89,6 +97,7 @@ export function ContasFiltros({
             className="text-xs px-2 py-1 border rounded bg-white"
           >
             <option value="">Todos</option>
+            <option value="__sem__">— sem responsável</option>
             {responsaveis.map((r) => (
               <option key={r} value={r}>
                 {r}
