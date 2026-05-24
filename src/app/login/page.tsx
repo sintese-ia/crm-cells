@@ -1,31 +1,32 @@
-import { signIn } from "@/auth";
-import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+
+async function getCsrfToken(): Promise<string> {
+  const h = await headers();
+  const host = h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const res = await fetch(`${proto}://${host}/api/auth/csrf`, { cache: "no-store" });
+  const data = await res.json();
+  return data.csrfToken as string;
+}
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; callbackUrl?: string }>;
 }) {
   const sp = await searchParams;
+  const csrfToken = await getCsrfToken();
+  const callbackUrl = sp?.callbackUrl || "/equipe";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F2F0EC]">
       <form
-        action={async (formData: FormData) => {
-          "use server";
-          try {
-            await signIn("credentials", {
-              email: formData.get("email"),
-              senha: formData.get("senha"),
-              redirectTo: "/contas",
-            });
-          } catch (e) {
-            const msg = (e as Error).message;
-            if (msg === "NEXT_REDIRECT") throw e;
-            redirect("/login?error=1");
-          }
-        }}
+        action="/api/auth/callback/credentials"
+        method="POST"
         className="w-[400px] bg-white rounded-lg border border-[#E5E2DC] p-10 shadow-sm"
       >
+        <input type="hidden" name="csrfToken" value={csrfToken} />
+        <input type="hidden" name="callbackUrl" value={callbackUrl} />
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-md bg-[#D4541A] flex items-center justify-center text-white font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
             C
