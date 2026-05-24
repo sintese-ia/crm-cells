@@ -60,6 +60,19 @@ export function HomologacaoCard(p: Props) {
   const currentStatus = p.status ?? "pendente_inicio";
   const colorCls = STATUS_COLOR[currentStatus] || "border-[#E5E2DC] bg-white text-[#0D0D0D]";
 
+  // Aprovada → render minimal (linha discreta, não card cheio)
+  if (currentStatus === "aprovada" && !editing) {
+    return (
+      <div className="flex items-center justify-between text-xs py-1.5 px-3 rounded bg-[#00897B]/10 text-[#00897B]">
+        <span className="flex items-center gap-1.5">
+          ✅ <span className="font-medium">Homologada</span>
+          {p.aprovadaEm && <span className="text-[#00897B]/70">· {new Date(p.aprovadaEm).toLocaleDateString("pt-BR")}</span>}
+        </span>
+        <button onClick={() => setEditing(true)} className="text-[#00897B]/70 hover:underline">editar</button>
+      </div>
+    );
+  }
+
   return (
     <section className={`border-2 rounded-lg p-5 ${editing ? "border-[#0D0D0D] bg-white" : colorCls}`}>
       <div className="flex items-center justify-between mb-3">

@@ -81,18 +81,22 @@ export function calcularJornada(
     fechar: concluidoFechar,
   };
 
-  // Determinar etapa atual (em_andamento) = primeira NÃO concluída
+  // Determinar etapa atual (em_andamento) = primeira NÃO concluída.
+  // Se ainda não teve contato algum (lig+wa zerados), começa pela ligação —
+  // não pode pular pra "marcar reunião" só porque funil_stage diz contatado
+  // (pode ter sido importado da planilha sem interação real no CRM).
+  const teveAlgumContato = concluidoLigacao || concluidoWA;
   const ordemEtapasObrigatorias: Etapa["key"][] = ["marcar_reuniao", "realizar_reuniao", "proposta", "fechar"];
   let etapaAtual: Etapa["key"] | null = null;
-  for (const k of ordemEtapasObrigatorias) {
-    if (!concluidas[k]) {
-      etapaAtual = k;
-      break;
-    }
-  }
-  // Caso especial: nenhuma interação ainda → etapa atual = ligacao (sugerir começar pela ligação)
-  if (!etapaAtual && intsSorted.length === 0) {
+  if (!teveAlgumContato) {
     etapaAtual = "ligacao";
+  } else {
+    for (const k of ordemEtapasObrigatorias) {
+      if (!concluidas[k]) {
+        etapaAtual = k;
+        break;
+      }
+    }
   }
 
   return ETAPAS_BASE.map<Etapa>((base) => {

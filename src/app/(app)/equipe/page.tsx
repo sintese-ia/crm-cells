@@ -7,6 +7,7 @@ import { FUNIL_COLOR, FUNIL_LABEL } from "@/lib/labels";
 import { ProximaAcaoMiniBtns } from "./_components/mini-btns";
 import { QuickActions } from "@/components/quick-actions";
 import { PrioBadge } from "@/components/prio-badge";
+import { QuickLog } from "@/components/quick-log";
 
 export const dynamic = "force-dynamic";
 
@@ -262,8 +263,10 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
                     </div>
                     <Link href={`/contas/${row.conta_id}`} className="font-semibold hover:underline">{row.nome}</Link>
                     {row.cidade && <span className="text-xs text-[#6B6B6B] ml-2">{row.cidade}/{row.uf}</span>}
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2 items-center">
                       <QuickActions telefone={row.telefone_institucional} whatsapp={row.whatsapp_institucional} />
+                      <span className="text-[#E5E2DC]">|</span>
+                      <QuickLog contaId={row.conta_id} />
                     </div>
                   </div>
                   <Link href={`/contas/${row.conta_id}`} className="text-xs px-3 py-2 bg-[#0D0D0D] text-white rounded hover:bg-[#1A1A1A] self-center whitespace-nowrap">abrir →</Link>
@@ -302,8 +305,10 @@ function CardAcao({ q, hoje, ultima }: { q: DataAcao; hoje: string; ultima?: { t
         <div className="text-xs text-[#6B6B6B] mt-1">
           {ehHoje ? "HOJE" : `Em ${new Date(q.dataPrevista + "T12:00").toLocaleDateString("pt-BR")}`}
         </div>
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap gap-2 items-center">
           <QuickActions telefone={q.tel} whatsapp={q.wa} />
+          <span className="text-[#E5E2DC]">|</span>
+          <QuickLog contaId={q.contaId} />
         </div>
       </div>
       <ProximaAcaoMiniBtns acaoId={q.acaoId} />
