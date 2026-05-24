@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { conta, interacao, CANAIS, FUNIL_STAGES, TEMPERATURAS, RESPONSAVEIS } from "@/db/schema";
-import { and, eq, ilike, or, sql, desc, isNull, inArray } from "drizzle-orm";
+import { CANAIS, FUNIL_STAGES, TEMPERATURAS, RESPONSAVEIS } from "@/db/schema";
+import { sql, type SQL } from "drizzle-orm";
 import Link from "next/link";
 import { FUNIL_LABEL, FUNIL_COLOR, CANAL_LABEL } from "@/lib/labels";
 import { ContasFiltros } from "./_components/filtros";
@@ -28,40 +28,34 @@ export default async function ContasPage({
 }) {
   const sp = await searchParams;
   const incluirFilhas = sp.incluirFilhas === "true";
-  const filters = [];
-  if (sp.busca)
-    filters.push(
-      or(
-        ilike(conta.nome, `%${sp.busca}%`),
-        ilike(conta.razaoSocial, `%${sp.busca}%`),
-        ilike(conta.cnpj, `%${sp.busca}%`),
-        ilike(conta.cidade, `%${sp.busca}%`)
-      )!
-    );
-  if (sp.canal) filters.push(eq(conta.canal, sp.canal));
-  if (sp.funil) filters.push(eq(conta.funilStage, sp.funil));
-  if (sp.resp === "__sem__") filters.push(isNull(conta.responsavel));
-  else if (sp.resp) filters.push(eq(conta.responsavel, sp.resp));
-  if (sp.temp) filters.push(eq(conta.temperatura, sp.temp));
-  if (sp.uf) filters.push(eq(conta.uf, sp.uf.toUpperCase()));
-  if (sp.prio) filters.push(sql`coalesce(${conta.prioridadeManual}, ${conta.prioridadeCalc}) = ${sp.prio}`);
+  // Filtros como SQL raw com prefixo "c." pra bater com o alias do FROM.
+  // (Drizzle interpola ${conta.X} como "b2b"."conta"."X", o que quebra
+  // quando o FROM usa alias.)
+  const filters: SQL[] = [];
+  if (sp.busca) {
+    const q = `%${sp.busca}%`;
+    filters.push(sql`(c.nome ILIKE ${q} OR c.razao_social ILIKE ${q} OR c.cnpj ILIKE ${q} OR c.cidade ILIKE ${q})`);
+  }
+  if (sp.canal) filters.push(sql`c.canal = ${sp.canal}`);
+  if (sp.funil) filters.push(sql`c.funil_stage = ${sp.funil}`);
+  if (sp.resp === "__sem__") filters.push(sql`c.responsavel IS NULL`);
+  else if (sp.resp) filters.push(sql`c.responsavel = ${sp.resp}`);
+  if (sp.temp) filters.push(sql`c.temperatura = ${sp.temp}`);
+  if (sp.uf) filters.push(sql`c.uf = ${sp.uf.toUpperCase()}`);
+  if (sp.prio) filters.push(sql`coalesce(c.prioridade_manual, c.prioridade_calc) = ${sp.prio}`);
   if (sp.homologacao === "pendente")
-    filters.push(sql`${conta.requerHomologacao} = true AND ${conta.statusHomologacao} IN ('pendente_inicio','docs_enviados','em_analise')`);
+    filters.push(sql`c.requer_homologacao = true AND c.status_homologacao IN ('pendente_inicio','docs_enviados','em_analise')`);
   else if (sp.homologacao === "aprovada")
-    filters.push(sql`${conta.requerHomologacao} = true AND ${conta.statusHomologacao} = 'aprovada'`);
+    filters.push(sql`c.requer_homologacao = true AND c.status_homologacao = 'aprovada'`);
   else if (sp.homologacao === "reprovada")
-    filters.push(sql`${conta.requerHomologacao} = true AND ${conta.statusHomologacao} = 'reprovada'`);
+    filters.push(sql`c.requer_homologacao = true AND c.status_homologacao = 'reprovada'`);
   else if (sp.homologacao === "nao_aplica")
-    filters.push(eq(conta.requerHomologacao, false));
-  // Default: esconde filhas (mostra matrizes + contas independentes)
-  // Exceção: filha aparece se já foi tocada (interação ou funil avançado)
+    filters.push(sql`c.requer_homologacao = false`);
   if (!incluirFilhas) {
-    filters.push(
-      sql`(${conta.contaMatrizId} IS NULL OR ${conta.funilStage} != 'base_fria' OR EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = ${conta.contaId}))`
-    );
+    filters.push(sql`(c.conta_matriz_id IS NULL OR c.funil_stage != 'base_fria' OR EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id))`);
   }
 
-  const where = filters.length ? and(...filters) : undefined;
+  const where = filters.length ? sql.join(filters, sql` AND `) : undefined;
   const ordemAtual = sp.ordem || "recente";
 
   // Query principal: contas + última interação + n filhas (se matriz)
@@ -93,8 +87,13 @@ export default async function ContasPage({
   `);
   const contas = (rows as unknown as { rows?: Record<string, unknown>[] }).rows ?? (rows as unknown as Record<string, unknown>[]);
 
-  const totalRow = await db.select({ n: sql<number>`count(*)::int` }).from(conta).where(where);
-  const total = totalRow[0]?.n ?? 0;
+  const totalRows = await db.execute(sql`
+    SELECT count(*)::int AS n
+    FROM b2b.conta c
+    ${where ? sql`WHERE ${where}` : sql``}
+  `);
+  const totalArr = (totalRows as unknown as { rows?: { n: number }[] }).rows ?? (totalRows as unknown as { n: number }[]);
+  const total = totalArr[0]?.n ?? 0;
 
   return (
     <div className="p-4 lg:p-8 max-w-[1400px] mx-auto">
