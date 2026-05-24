@@ -86,7 +86,7 @@ async function pegarFrios(pessoa: string) {
       CASE coalesce(r.prioridade_manual, r.prioridade_calc)
         WHEN 'alta' THEN 0 WHEN 'media' THEN 1 WHEN 'baixa' THEN 2 ELSE 3 END ASC,
       rede_size DESC NULLS LAST, conta_id
-    LIMIT 10
+    LIMIT 100
   `);
   return (frios as unknown as { rows?: Record<string, unknown>[] }).rows ?? (frios as unknown as Record<string, unknown>[]);
 }
@@ -100,6 +100,11 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
 
   const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const hoje = new Date().toISOString().slice(0, 10);
+  const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
+  const inicioSemana = new Date(); inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay()); inicioSemana.setHours(0, 0, 0, 0);
+
+  // Meta diária de calls por pessoa (depois vira config no /admin)
+  const METAS = { gabriel: 30, yasmin: 100, gabi: 100 } as Record<string, number>;
 
   // VIEW CONSOLIDADA
   if (ativa === "todos") {
@@ -143,12 +148,16 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
   }
 
   // VIEW POR PESSOA
-  const [ligacoesSemana, reuMarcadas, emNeg, positivados] = await Promise.all([
+  const metaCalls = METAS[ativa] ?? 50;
+  const [ligacoesHoje, whatsappsHoje, ligacoesSemana, reuSemana, positivados] = await Promise.all([
+    db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, inicioDia))),
+    db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "whatsapp"), gte(interacao.ocorridoEm, inicioDia))),
     db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, seteDiasAtras))),
-    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "visitado"))),
-    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), inArray(conta.funilStage, ["contatado", "proposta_enviada"]))),
+    db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "reuniao"), gte(interacao.ocorridoEm, inicioSemana))),
     db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "positivado"))),
   ]);
+  const nLigacoesHoje = ligacoesHoje[0]?.n ?? 0;
+  const nWhatsappsHoje = whatsappsHoje[0]?.n ?? 0;
 
   const todasAcoes = await pegarAcoesAteSeteDias(ativa);
   const atrasadas = todasAcoes.filter((a) => a.dataPrevista < hoje);
@@ -176,13 +185,22 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto">
-      <Header ativa={ativa} totalAcoes={todasAcoes.length} totalFrios={friosRows.length} />
+      <Header
+        ativa={ativa}
+        atrasadas={atrasadas.length}
+        hojeAcoes={hojeAcoes.length}
+        frios={friosRows.length}
+        callsHoje={nLigacoesHoje}
+        metaCalls={metaCalls}
+      />
+
+      <MetaCallsBar feito={nLigacoesHoje} meta={metaCalls} whatsappsHoje={nWhatsappsHoje} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 mb-6 lg:mb-8">
-        <StatCard label="📞 Ligações 7d" valor={ligacoesSemana[0]?.n ?? 0} />
-        <StatCard label="📅 Reuniões marcadas" valor={reuMarcadas[0]?.n ?? 0} />
-        <StatCard label="🤝 Em negociação" valor={emNeg[0]?.n ?? 0} />
-        <StatCard label="🎉 Positivados" valor={positivados[0]?.n ?? 0} cor="text-[#00897B]" />
+        <StatCard label="📞 Calls 7d" valor={ligacoesSemana[0]?.n ?? 0} />
+        <StatCard label="💬 WA hoje" valor={nWhatsappsHoje} />
+        <StatCard label="📅 Reuniões esta semana" valor={reuSemana[0]?.n ?? 0} />
+        <StatCard label="🎉 Positivados (total)" valor={positivados[0]?.n ?? 0} cor="text-[#00897B]" />
       </div>
 
       {atrasadas.length > 0 && (
@@ -224,7 +242,7 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
 
       <section>
         <h2 className="text-sm font-bold uppercase tracking-wider text-[#6B6B6B] mb-3">
-          ❄️ Frios — primeiro contato hoje (top {friosRows.length})
+          ❄️ Frios — fila pra abordar ({friosRows.length} disponíveis · meta {metaCalls} calls/dia)
         </h2>
         {friosRows.length === 0 ? (
           <p className="text-sm text-[#6B6B6B] py-6 text-center bg-white border border-[#E5E2DC] rounded-lg">
@@ -313,20 +331,33 @@ function MiniGrupo({ label, cor, acoes, hoje }: { label: string; cor: string; ac
   );
 }
 
-function Header({ ativa, totalAcoes, totalFrios }: { ativa: string; totalAcoes?: number; totalFrios?: number }) {
+function Header({ ativa, atrasadas, hojeAcoes, frios, callsHoje, metaCalls }: {
+  ativa: string;
+  atrasadas?: number;
+  hojeAcoes?: number;
+  frios?: number;
+  callsHoje?: number;
+  metaCalls?: number;
+}) {
+  const label = ativa === "gabriel" ? "Bom dia, Gabriel" : ativa === "yasmin" ? "Bom dia, Yasmin" : ativa === "gabi" ? "Bom dia, Gabi" : "Equipe";
   return (
     <div className="flex flex-col gap-3 mb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
-          {ativa === "todos" ? "Próximas ações da equipe" : "Próximas ações"}
+          {ativa === "todos" ? "Próximas ações da equipe" : label}
         </h1>
-        <p className="text-sm text-[#6B6B6B]">
-          {ativa === "todos"
-            ? "O que cada um tem pra fazer hoje e nos próximos 7d"
-            : totalAcoes !== undefined
-            ? `${totalAcoes} ações em 7 dias · ${totalFrios} frios`
-            : ""}
-        </p>
+        {ativa === "todos" ? (
+          <p className="text-sm text-[#6B6B6B]">O que cada um tem pra fazer hoje e nos próximos 7d</p>
+        ) : (
+          <p className="text-sm text-[#6B6B6B]">
+            {atrasadas !== undefined && atrasadas > 0 && <span className="text-[#BF360C] font-medium">{atrasadas} atrasadas · </span>}
+            <span className="text-[#D4541A] font-medium">{hojeAcoes ?? 0} ações hoje</span>
+            {frios !== undefined && <span> · {frios} frios na fila</span>}
+            {callsHoje !== undefined && metaCalls !== undefined && (
+              <span> · {callsHoje}/{metaCalls} calls feitas hoje</span>
+            )}
+          </p>
+        )}
       </div>
       <div className="flex gap-1 overflow-x-auto -mx-1 px-1 pb-1">
         <Link href="/equipe?p=todos" className={`shrink-0 px-3 py-2 text-sm rounded-md border ${ativa === "todos" ? "bg-[#0D0D0D] text-white border-[#0D0D0D]" : "bg-white text-[#0D0D0D] border-[#E5E2DC] hover:bg-[#F2F0EC]"}`}>
@@ -347,6 +378,42 @@ function StatCard({ label, valor, cor = "text-[#0D0D0D]" }: { label: string; val
     <div className="bg-white border border-[#E5E2DC] rounded-lg p-4">
       <div className="text-xs text-[#6B6B6B] mb-1">{label}</div>
       <div className={`text-2xl font-bold ${cor}`}>{valor}</div>
+    </div>
+  );
+}
+
+function MetaCallsBar({ feito, meta, whatsappsHoje }: { feito: number; meta: number; whatsappsHoje: number }) {
+  const pct = Math.min(100, Math.round((feito / meta) * 100));
+  const faltam = Math.max(0, meta - feito);
+  const corBarra = pct >= 100 ? "bg-[#00897B]" : pct >= 70 ? "bg-[#D4541A]" : "bg-[#0091EA]";
+  const corTexto = pct >= 100 ? "text-[#00897B]" : "text-[#0D0D0D]";
+  return (
+    <div className="bg-white border-2 border-[#E5E2DC] rounded-lg p-5 mb-6">
+      <div className="flex items-end justify-between mb-2 flex-wrap gap-2">
+        <div>
+          <div className="text-xs text-[#6B6B6B] uppercase tracking-wider mb-1">📞 Meta de calls de hoje</div>
+          <div className="flex items-baseline gap-2">
+            <span className={`text-3xl font-bold ${corTexto}`}>{feito}</span>
+            <span className="text-lg text-[#6B6B6B]">/ {meta} calls</span>
+          </div>
+        </div>
+        <div className="text-right">
+          {pct >= 100 ? (
+            <div className="text-[#00897B] font-bold text-sm">✅ Meta batida!</div>
+          ) : (
+            <div className="text-sm">
+              <div className="font-bold text-[#D4541A]">{faltam} calls</div>
+              <div className="text-xs text-[#6B6B6B]">pra bater a meta</div>
+            </div>
+          )}
+          {whatsappsHoje > 0 && (
+            <div className="text-xs text-[#6B6B6B] mt-1">+ {whatsappsHoje} WA hoje</div>
+          )}
+        </div>
+      </div>
+      <div className="w-full h-3 bg-[#F2F0EC] rounded-full overflow-hidden">
+        <div className={`h-full ${corBarra} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
