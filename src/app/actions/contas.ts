@@ -12,7 +12,7 @@ import {
   type Conta,
 } from "@/db/schema";
 import { auth } from "@/auth";
-import { eq, and, sql, count, asc, lte, gte } from "drizzle-orm";
+import { eq, and, sql, count, asc, lte, gte, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 function fmtISODate(d: Date) {
@@ -362,6 +362,65 @@ export async function desvincularMatriz(
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function buscarFilhasCandidatas(
+  query: string,
+  matrizContaId: number
+): Promise<{ ok: boolean; candidatas: { contaId: number; nome: string; cidade: string | null; uf: string | null; canal: string }[] }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, candidatas: [] };
+  try {
+    const q = `%${query}%`;
+    const results = await db.execute(sql`
+      SELECT c.conta_id AS "contaId", c.nome, c.cidade, c.uf, c.canal
+      FROM b2b.conta c
+      WHERE c.conta_id != ${matrizContaId}
+        AND (c.conta_matriz_id IS NULL OR c.conta_matriz_id != ${matrizContaId})
+        AND NOT EXISTS (SELECT 1 FROM b2b.conta f WHERE f.conta_matriz_id = c.conta_id)
+        AND (c.nome ILIKE ${q} OR c.razao_social ILIKE ${q} OR c.cnpj ILIKE ${q} OR c.cidade ILIKE ${q})
+      ORDER BY c.nome
+      LIMIT 50
+    `);
+    const rows = (results as unknown as { rows?: Record<string, unknown>[] }).rows ?? (results as unknown as Record<string, unknown>[]);
+    return { ok: true, candidatas: rows as { contaId: number; nome: string; cidade: string | null; uf: string | null; canal: string }[] };
+  } catch {
+    return { ok: false, candidatas: [] };
+  }
+}
+
+export async function vincularFilhasEmMassa(
+  matrizContaId: number,
+  filhaIds: number[]
+): Promise<{ ok: boolean; vinculadas: number; error?: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, vinculadas: 0, error: "não autenticado" };
+  if (filhaIds.length === 0) return { ok: true, vinculadas: 0 };
+  try {
+    const [matriz] = await db.select({ nome: conta.nome, contaMatrizId: conta.contaMatrizId }).from(conta).where(eq(conta.contaId, matrizContaId));
+    if (!matriz) return { ok: false, vinculadas: 0, error: "Matriz não encontrada" };
+    if (matriz.contaMatrizId) return { ok: false, vinculadas: 0, error: "Esta conta já é filha de outra matriz" };
+
+    const result = await db
+      .update(conta)
+      .set({ contaMatrizId: matrizContaId, updatedAt: new Date() })
+      .where(and(inArray(conta.contaId, filhaIds), sql`${conta.contaId} != ${matrizContaId}`));
+
+    for (const fid of filhaIds) {
+      await logAuditoria({
+        contaId: fid,
+        acao: "vinculou_matriz",
+        campo: "contaMatrizId",
+        valorDepois: `${matrizContaId} (${matriz.nome}) · vinculação em massa`,
+      });
+    }
+
+    revalidatePath(`/contas/${matrizContaId}`);
+    revalidatePath("/contas");
+    return { ok: true, vinculadas: filhaIds.length };
+  } catch (e) {
+    return { ok: false, vinculadas: 0, error: (e as Error).message };
   }
 }
 

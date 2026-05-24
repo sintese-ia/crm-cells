@@ -22,8 +22,29 @@ export function EditarConta({ conta }: { conta: Conta }) {
     });
   };
 
+  const prioAtual = conta.prioridadeManual ?? "";
+  const prioCalc = conta.prioridadeCalc ?? "—";
+
   return (
     <div className="grid grid-cols-4 gap-3 text-sm">
+      <div className="col-span-4 -mb-1 flex items-center gap-2 flex-wrap text-xs">
+        <span className="text-zinc-500 uppercase tracking-wider">🔥 Prioridade:</span>
+        <select
+          value={prioAtual}
+          onChange={(e) => update("prioridadeManual", e.target.value || null)}
+          disabled={isPending}
+          className="px-2 py-1 border rounded bg-white text-xs"
+        >
+          <option value="">automática ({prioCalc})</option>
+          <option value="alta">🔥 alta (manual)</option>
+          <option value="media">🟠 média (manual)</option>
+          <option value="baixa">⚪ baixa (manual)</option>
+          <option value="descartar">⊘ descartar (manual)</option>
+        </select>
+        {prioAtual && (
+          <span className="text-[10px] text-[#6B6B6B]">substitui o cálculo automático</span>
+        )}
+      </div>
       <div>
         <label className="text-xs text-zinc-500">Funil</label>
         <select

@@ -13,6 +13,7 @@ import { calcularJornada } from "@/lib/jornada";
 import { QuickActions } from "@/components/quick-actions";
 import { AdicionarContato } from "./_components/adicionar-contato";
 import { VincularMatriz } from "./_components/vincular-matriz";
+import { VincularFilhas } from "./_components/vincular-filhas";
 import { HomologacaoCard } from "./_components/homologacao";
 
 export const dynamic = "force-dynamic";
@@ -281,8 +282,11 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
             ) : (
               <div className="text-xs text-[#6B6B6B] mb-2">Conta independente (sem rede)</div>
             )}
-            <div className="mt-2">
+            <div className="mt-2 flex flex-col gap-1.5">
               <VincularMatriz contaId={contaId} matrizAtual={contaMatriz ?? null} ehMatriz={filhasMatriz.length > 0} />
+              {!c.contaMatrizId && (
+                <VincularFilhas matrizContaId={contaId} matrizNome={c.nome} />
+              )}
             </div>
           </section>
         </div>
