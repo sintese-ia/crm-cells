@@ -18,7 +18,7 @@ export default auth((req) => {
     (req.auth?.user as { role?: string })?.role !== "admin"
   ) {
     const url = req.nextUrl.clone();
-    url.pathname = "/equipe";
+    url.pathname = "/hoje";
     return NextResponse.redirect(url);
   }
 });
