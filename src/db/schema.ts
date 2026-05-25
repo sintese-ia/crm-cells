@@ -55,6 +55,9 @@ export const conta = b2b.table("conta", {
   homologacaoNotas: text("homologacao_notas"),
   requerCadastro: boolean("requer_cadastro").notNull().default(false),
   fupTravadoAte: date("fup_travado_ate"),
+  origem: text("origem"),
+  marcasConcorrentes: text("marcas_concorrentes").array().default(sql`'{}'::text[]`),
+  produtosVendidos: text("produtos_vendidos").array().default(sql`'{}'::text[]`),
   notas: text("notas"),
   clickupTaskId: text("clickup_task_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -93,6 +96,10 @@ export const interacao = b2b.table("interacao", {
     .references(() => conta.contaId, { onDelete: "cascade" }),
   contatoId: bigint("contato_id", { mode: "number" }).references(
     () => contato.contatoId,
+    { onDelete: "set null" }
+  ),
+  lojaId: bigint("loja_id", { mode: "number" }).references(
+    (): AnyPgColumn => conta.contaId,
     { onDelete: "set null" }
   ),
   autor: text("autor").notNull().default("gabriel"),

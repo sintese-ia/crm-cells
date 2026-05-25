@@ -1,10 +1,16 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck, Zap } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck, Zap, Search, Activity } from "lucide-react";
 
+// NAV principal — só 3 itens. O resto é consulta secundária.
 const NAV = [
   { href: "/fila", label: "Fila do Dia", icon: Zap },
+  { href: "/buscar", label: "Buscar", icon: Search },
+];
+
+// Secundárias — aparece em "ver mais" colapsável
+const NAV_SECUNDARIA = [
   { href: "/equipe", label: "Equipe (lista)", icon: UsersRound },
   { href: "/agenda", label: "Agenda", icon: Calendar },
   { href: "/contas", label: "Contas", icon: Users },
@@ -85,15 +91,49 @@ export function Sidebar({
             );
           })}
           {isAdmin && (
-            <div className="mt-6 pt-3 border-t border-[#2A2A2A]">
-              <div className="text-[10px] text-[#6B6B6B] uppercase tracking-wider px-3 mb-1">Admin</div>
-              <Link href="/admin/cadencias" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] text-sm transition-colors">
-                <Settings className="w-4 h-4" /> Cadências
-              </Link>
-              <Link href="/admin/atividade" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] text-sm transition-colors">
-                <Users className="w-4 h-4" /> Atividade equipe
-              </Link>
+            <Link href="/pulso" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] text-sm transition-colors">
+              <Activity className="w-4 h-4" />
+              Pulso
+              <span className="text-[9px] text-[#6B6B6B] ml-auto">admin</span>
+            </Link>
+          )}
+
+          <details className="mt-4 pt-3 border-t border-[#2A2A2A] group">
+            <summary className="text-[10px] text-[#6B6B6B] uppercase tracking-wider px-3 mb-1 cursor-pointer hover:text-white list-none flex items-center gap-1">
+              <span className="group-open:rotate-90 transition-transform">▸</span> Outras telas
+            </summary>
+            <div className="mt-1">
+              {NAV_SECUNDARIA.map((n) => {
+                const Icon = n.icon;
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-[#1A1A1A] text-xs text-[#999] transition-colors"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {n.label}
+                  </Link>
+                );
+              })}
             </div>
+          </details>
+
+          {isAdmin && (
+            <details className="mt-3 group">
+              <summary className="text-[10px] text-[#6B6B6B] uppercase tracking-wider px-3 mb-1 cursor-pointer hover:text-white list-none flex items-center gap-1">
+                <span className="group-open:rotate-90 transition-transform">▸</span> Admin
+              </summary>
+              <div className="mt-1">
+                <Link href="/admin/cadencias" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-[#1A1A1A] text-xs text-[#999] transition-colors">
+                  <Settings className="w-3.5 h-3.5" /> Cadências
+                </Link>
+                <Link href="/admin/atividade" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-[#1A1A1A] text-xs text-[#999] transition-colors">
+                  <Users className="w-3.5 h-3.5" /> Atividade equipe
+                </Link>
+              </div>
+            </details>
           )}
         </nav>
 

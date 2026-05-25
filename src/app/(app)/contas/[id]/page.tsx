@@ -16,6 +16,7 @@ import { AdicionarContato } from "./_components/adicionar-contato";
 import { VincularMatriz } from "./_components/vincular-matriz";
 import { VincularFilhas } from "./_components/vincular-filhas";
 import { HomologacaoCard } from "./_components/homologacao";
+import { InteligenciaLead } from "./_components/inteligencia";
 
 export const dynamic = "force-dynamic";
 
@@ -307,6 +308,16 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
                 ))}
               </ul>
             </section>
+          )}
+
+          {/* Inteligência do lead — só quando esquentou (funil >= visitado) */}
+          {["visitado", "proposta_enviada", "pedido_realizado", "positivado"].includes(c.funilStage) && (
+            <InteligenciaLead
+              contaId={contaId}
+              origem={c.origem}
+              marcasConcorrentes={c.marcasConcorrentes}
+              produtosVendidos={c.produtosVendidos}
+            />
           )}
 
           {/* Vínculo de matriz (visível em qualquer conta) */}
