@@ -1,9 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import type { Acao } from "@/db/schema";
-import { reagendarAcao, marcarAcaoFeita } from "@/app/actions/contas";
+import { reagendarAcao } from "@/app/actions/contas";
 import { toast } from "sonner";
-import { Calendar, Check, Edit2 } from "lucide-react";
+import { Calendar, Edit2 } from "lucide-react";
 
 export function ProximaAcao({ acao }: { acao: Acao }) {
   const [isPending, startTransition] = useTransition();
@@ -63,19 +63,10 @@ export function ProximaAcao({ acao }: { acao: Acao }) {
             </div>
           )}
         </div>
-        <button
-          onClick={() =>
-            startTransition(async () => {
-              const r = await marcarAcaoFeita(acao.acaoId);
-              if (r.ok) toast.success("Ação concluída");
-              else toast.error(r.error || "Falha");
-            })
-          }
-          disabled={isPending}
-          className="text-xs px-3 py-2 bg-[#00897B] text-white rounded hover:bg-[#00695C] flex items-center gap-1.5 self-center"
-        >
-          <Check className="w-3 h-3" /> feito
-        </button>
+        <div className="text-[10px] text-[#6B6B6B] italic self-center text-right max-w-[180px] leading-tight">
+          Pra fechar: registre o resultado da ligação/WA na timeline abaixo<br/>
+          (a próxima ação é criada automaticamente)
+        </div>
       </div>
     </div>
   );
