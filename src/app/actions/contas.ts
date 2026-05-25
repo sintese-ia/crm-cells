@@ -364,21 +364,47 @@ export async function marcarAcaoFeita(
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "não autenticado" };
+  const u = session.user as { id?: string; name?: string };
+  const autor = (u.id || "outro").toLowerCase();
+  const autorValido = ["gabriel", "gabi", "yasmin", "ismael", "lilian", "claude"].includes(autor) ? autor : "outro";
+
   try {
     const [a] = await db.select().from(acao).where(eq(acao.acaoId, acaoId));
+    if (!a) return { ok: false, error: "ação não encontrada" };
+
+    // Marca como feita
     await db
       .update(acao)
       .set({ status: "feito", concluidoEm: new Date(), updatedAt: new Date() })
       .where(eq(acao.acaoId, acaoId));
-    if (a) {
-      await logAuditoria({
-        contaId: a.contaId,
-        acao: "marcou_acao_feita",
-        campo: "acao",
-        valorDepois: a.descricao,
-      });
-    }
-    revalidatePath("/hoje");
+
+    // Cria interação genérica na timeline (fecha o ciclo visual mesmo sem
+    // resultado escolhido). Tipo da interação espelha o tipo da ação.
+    const tipoInter =
+      a.tipo === "ligar" ? "ligacao"
+      : a.tipo === "mandar_whatsapp" ? "whatsapp"
+      : a.tipo === "enviar_proposta" ? "proposta"
+      : a.tipo === "visitar" ? "visita"
+      : "outro";
+    await db.insert(interacao).values({
+      contaId: a.contaId,
+      tipo: tipoInter,
+      texto: `Ação cumprida: ${a.descricao}`,
+      autor: autorValido,
+      situacaoId: null,
+      tentativaNum: null,
+    });
+
+    await logAuditoria({
+      contaId: a.contaId,
+      acao: "marcou_acao_feita",
+      campo: "acao",
+      valorDepois: a.descricao,
+      contexto: { obs: "Sem situação → próxima ação não disparada automaticamente. Use QuickLog pra registrar resultado." },
+    });
+
+    revalidatePath(`/contas/${a.contaId}`);
+    revalidatePath("/fila");
     revalidatePath("/equipe");
     return { ok: true };
   } catch (e) {
