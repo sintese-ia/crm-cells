@@ -352,17 +352,18 @@ function Header({ ativa, atrasadas, hojeAcoes, frios, callsHoje, metaCalls }: {
   callsHoje?: number;
   metaCalls?: number;
 }) {
-  const label = ativa === "gabriel" ? "Bom dia, Gabriel" : ativa === "yasmin" ? "Bom dia, Yasmin" : ativa === "gabi" ? "Bom dia, Gabi" : "Equipe";
+  const nomePessoa = ativa === "gabriel" ? "Gabriel" : ativa === "yasmin" ? "Yasmin" : ativa === "gabi" ? "Gabi" : ativa;
   return (
     <div className="flex flex-col gap-3 mb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
-          {ativa === "todos" ? "Próximas ações da equipe" : label}
+          {ativa === "todos" ? "Visão do time" : "Minhas atividades"}
         </h1>
         {ativa === "todos" ? (
           <p className="text-sm text-[#6B6B6B]">O que cada um tem pra fazer hoje e nos próximos 7d</p>
         ) : (
           <p className="text-sm text-[#6B6B6B]">
+            <span className="font-medium capitalize">{nomePessoa}</span> ·{" "}
             {atrasadas !== undefined && atrasadas > 0 && <span className="text-[#BF360C] font-medium">{atrasadas} atrasadas · </span>}
             <span className="text-[#D4541A] font-medium">{hojeAcoes ?? 0} ações hoje</span>
             {frios !== undefined && <span> · {frios} frios na fila</span>}

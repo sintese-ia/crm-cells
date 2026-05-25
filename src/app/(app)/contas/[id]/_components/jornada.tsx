@@ -17,15 +17,24 @@ export function JornadaCard({
 }) {
   const modalRef = useRef<{ open: (tipo?: string) => void }>(null);
 
+  // Esconde "Negativa" se não está em uso (mantém visual limpo)
+  const negativaEtapa = etapas.find((e) => e.key === "negativa");
+  const showNegativa = negativaEtapa && (negativaEtapa.estado === "em_andamento" || negativaEtapa.estado === "desviada");
+  const etapasVisiveis = etapas.filter((e) => e.key !== "negativa" || showNegativa);
+
   const cor = (e: Etapa) => {
     if (e.estado === "concluida") return "bg-[#00897B] text-white border-[#00897B]";
-    if (e.estado === "em_andamento") return "bg-[#FFF7F0] text-[#D4541A] border-[#D4541A]";
+    if (e.estado === "em_andamento") return e.key === "negativa"
+      ? "bg-[#BF360C] text-white border-[#BF360C]"
+      : "bg-[#FFF7F0] text-[#D4541A] border-[#D4541A]";
+    if (e.estado === "desviada") return "bg-[#BF360C]/10 text-[#BF360C] border-[#BF360C]/40";
     return "bg-white text-[#6B6B6B] border-[#E5E2DC]";
   };
 
   const icone = (e: Etapa) => {
     if (e.estado === "concluida") return "✅";
     if (e.estado === "em_andamento") return "🔄";
+    if (e.estado === "desviada") return "↘";
     return "⬜";
   };
 
@@ -36,11 +45,11 @@ export function JornadaCard({
       <div className="text-xs uppercase tracking-wider text-[#6B6B6B] mb-2 font-medium">
         ⚡ Jornada
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {etapas.map((e) => (
+      <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-${etapasVisiveis.length <= 6 ? etapasVisiveis.length : 6} gap-2`}>
+        {etapasVisiveis.map((e) => (
           <button
             key={e.id}
-            onClick={() => modalRef.current?.open(e.tipoInteracao)}
+            onClick={() => modalRef.current?.open()}
             className={`text-left rounded-lg border-2 p-3 transition-all hover:shadow-sm ${cor(e)}`}
             title="Click pra registrar interação dessa etapa"
           >

@@ -1,21 +1,22 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck, Zap, Search, Activity } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck, Zap, Search, Activity, ClipboardList } from "lucide-react";
 
-// NAV principal — só 3 itens. O resto é consulta secundária.
+// NAV principal — 3 itens, o que a pessoa usa todo dia.
 const NAV = [
   { href: "/fila", label: "Fila do Dia", icon: Zap },
+  { href: "/equipe", label: "Minhas atividades", icon: ClipboardList },
   { href: "/buscar", label: "Buscar", icon: Search },
 ];
 
-// Secundárias — aparece em "ver mais" colapsável
+// Secundárias — consulta ocasional, colapsada por default
 const NAV_SECUNDARIA = [
-  { href: "/equipe", label: "Equipe (lista)", icon: UsersRound },
+  { href: "/equipe?p=todos", label: "Visão do time", icon: UsersRound },
   { href: "/agenda", label: "Agenda", icon: Calendar },
-  { href: "/contas", label: "Contas", icon: Users },
+  { href: "/contas", label: "Todas as contas", icon: Users },
   { href: "/compradores", label: "Compradores", icon: UserCircle },
-  { href: "/pipeline", label: "Pipeline", icon: Kanban },
+  { href: "/pipeline", label: "Pipeline (kanban)", icon: Kanban },
   { href: "/homologacoes", label: "Homologações", icon: ShieldCheck },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/importar", label: "Importar", icon: Upload },
