@@ -713,3 +713,168 @@ export async function reagendarAcao(
   }
 }
 
+// ============================================================
+// FILA DO DIA — getProximoCard
+// Retorna 1 card a servir pra pessoa, seguindo ordenação:
+// 1) Tarefa explícita de homologação/cadastro/bloqueio (origem='bloqueio_homol')
+// 2) Atrasada quente (cadencia_quente OU manual, data_prevista < hoje)
+// 3) Conta em risco (funil quente + última interação > 15d, sem ação ativa)
+// 4) Hoje (data_prevista = hoje)
+// 5) Próximos 3 dias quentes
+// 6) Fila de frios (base_fria, sem matriz pai, sem interação, prioridade alta primeiro)
+// ============================================================
+
+export type CardFila = {
+  origem: "bloqueio" | "atrasada" | "em_risco" | "hoje" | "proximo" | "frio";
+  porQue: string;
+  contaId: number;
+  nome: string;
+  cidade: string | null;
+  uf: string | null;
+  tel: string | null;
+  wa: string | null;
+  funilStage: string;
+  requerHomol: boolean;
+  statusHomol: string | null;
+  requerCad: boolean;
+  contatoPrincipal: string | null;
+  ultimaSituacao: string | null;
+  ultimaInteracaoEm: Date | null;
+  ultimaInteracaoTexto: string | null;
+  acaoId: number | null;
+  acaoTipo: string | null;
+  acaoDescricao: string | null;
+  acaoDataPrevista: string | null;
+};
+
+export async function getProximoCard(
+  pessoa: string,
+  pulados: number[] = []
+): Promise<CardFila | null> {
+  const session = await auth();
+  if (!session?.user) return null;
+
+  const baseQuery = (whereExtra: string, orderExtra: string) => sql`
+    SELECT c.conta_id, c.nome, c.cidade, c.uf,
+           c.telefone_institucional AS tel, c.whatsapp_institucional AS wa,
+           c.funil_stage, c.requer_homologacao, c.status_homologacao, c.requer_cadastro,
+           (SELECT ct.nome FROM b2b.contato ct WHERE ct.conta_id=c.conta_id ORDER BY ct.e_principal DESC LIMIT 1) AS contato_principal,
+           (SELECT i.situacao_id FROM b2b.interacao i WHERE i.conta_id=c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_situacao,
+           (SELECT i.ocorrido_em FROM b2b.interacao i WHERE i.conta_id=c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_em,
+           (SELECT i.texto FROM b2b.interacao i WHERE i.conta_id=c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_texto,
+           a.acao_id, a.tipo AS acao_tipo, a.descricao AS acao_descricao, a.data_prevista AS acao_data
+    FROM b2b.conta c
+    LEFT JOIN b2b.acao a ON a.conta_id=c.conta_id AND a.status='pendente' AND a.responsavel=${pessoa}
+    WHERE c.responsavel = ${pessoa}
+      ${pulados.length > 0 ? sql`AND c.conta_id != ALL(${pulados}::bigint[])` : sql``}
+      ${sql.raw(whereExtra)}
+    ${sql.raw(orderExtra)}
+    LIMIT 1
+  `;
+
+  // 1. Bloqueio (homologação/cadastro)
+  let r = await db.execute(baseQuery(
+    `AND a.origem = 'bloqueio_homol' AND a.status='pendente'`,
+    `ORDER BY a.data_prevista ASC`
+  ));
+  let rows = (r as unknown as { rows?: Record<string, unknown>[] }).rows ?? (r as unknown as Record<string, unknown>[]);
+  if (rows.length > 0) return mapCard(rows[0], "bloqueio", rows[0].acao_descricao as string);
+
+  // 2. Atrasada quente
+  r = await db.execute(baseQuery(
+    `AND a.status='pendente' AND a.data_prevista < CURRENT_DATE AND a.origem IN ('cadencia_quente','manual')`,
+    `ORDER BY a.data_prevista ASC`
+  ));
+  rows = (r as unknown as { rows?: Record<string, unknown>[] }).rows ?? (r as unknown as Record<string, unknown>[]);
+  if (rows.length > 0) return mapCard(rows[0], "atrasada", "Atrasada — precisa ligar agora");
+
+  // 3. Em risco (funil quente, última interação > 15d, sem ação ativa hoje)
+  r = await db.execute(sql`
+    SELECT c.conta_id, c.nome, c.cidade, c.uf,
+           c.telefone_institucional AS tel, c.whatsapp_institucional AS wa,
+           c.funil_stage, c.requer_homologacao, c.status_homologacao, c.requer_cadastro,
+           (SELECT ct.nome FROM b2b.contato ct WHERE ct.conta_id=c.conta_id ORDER BY ct.e_principal DESC LIMIT 1) AS contato_principal,
+           (SELECT i.situacao_id FROM b2b.interacao i WHERE i.conta_id=c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_situacao,
+           (SELECT i.ocorrido_em FROM b2b.interacao i WHERE i.conta_id=c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_em,
+           (SELECT i.texto FROM b2b.interacao i WHERE i.conta_id=c.conta_id ORDER BY i.ocorrido_em DESC LIMIT 1) AS ultima_texto,
+           NULL::bigint AS acao_id, NULL::text AS acao_tipo, NULL::text AS acao_descricao, NULL::date AS acao_data
+    FROM b2b.conta c
+    WHERE c.responsavel = ${pessoa}
+      AND c.funil_stage IN ('visitado','proposta_enviada','pedido_realizado','positivado')
+      AND (SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id=c.conta_id) < (NOW() - INTERVAL '15 days')
+      AND NOT EXISTS (SELECT 1 FROM b2b.acao a WHERE a.conta_id=c.conta_id AND a.status='pendente')
+      ${pulados.length > 0 ? sql`AND c.conta_id != ALL(${pulados}::bigint[])` : sql``}
+    ORDER BY (SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id=c.conta_id) ASC
+    LIMIT 1
+  `);
+  rows = (r as unknown as { rows?: Record<string, unknown>[] }).rows ?? (r as unknown as Record<string, unknown>[]);
+  if (rows.length > 0) return mapCard(rows[0], "em_risco", "⚠️ Quente parado >15d — vai esfriar");
+
+  // 4. Hoje
+  r = await db.execute(baseQuery(
+    `AND a.status='pendente' AND a.data_prevista = CURRENT_DATE`,
+    `ORDER BY a.acao_id ASC`
+  ));
+  rows = (r as unknown as { rows?: Record<string, unknown>[] }).rows ?? (r as unknown as Record<string, unknown>[]);
+  if (rows.length > 0) return mapCard(rows[0], "hoje", rows[0].acao_descricao as string);
+
+  // 5. Próximos 3 dias quentes
+  r = await db.execute(baseQuery(
+    `AND a.status='pendente' AND a.data_prevista <= CURRENT_DATE + INTERVAL '3 days' AND a.origem IN ('cadencia_quente','manual')`,
+    `ORDER BY a.data_prevista ASC`
+  ));
+  rows = (r as unknown as { rows?: Record<string, unknown>[] }).rows ?? (r as unknown as Record<string, unknown>[]);
+  if (rows.length > 0) return mapCard(rows[0], "proximo", `Quente em ${rows[0].acao_data}`);
+
+  // 6. Fila de frios (sem interação, sem matriz pai, prioridade alta primeiro)
+  r = await db.execute(sql`
+    SELECT c.conta_id, c.nome, c.cidade, c.uf,
+           c.telefone_institucional AS tel, c.whatsapp_institucional AS wa,
+           c.funil_stage, c.requer_homologacao, c.status_homologacao, c.requer_cadastro,
+           NULL::text AS contato_principal,
+           NULL::text AS ultima_situacao, NULL::timestamptz AS ultima_em, NULL::text AS ultima_texto,
+           NULL::bigint AS acao_id, NULL::text AS acao_tipo, NULL::text AS acao_descricao, NULL::date AS acao_data
+    FROM b2b.conta c
+    WHERE c.responsavel = ${pessoa}
+      AND c.funil_stage = 'base_fria'
+      AND c.conta_matriz_id IS NULL
+      AND coalesce(c.prioridade_manual, c.prioridade_calc) != 'descartar'
+      AND NOT EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id=c.conta_id)
+      ${pulados.length > 0 ? sql`AND c.conta_id != ALL(${pulados}::bigint[])` : sql``}
+    ORDER BY
+      CASE coalesce(c.prioridade_manual, c.prioridade_calc)
+        WHEN 'alta' THEN 0 WHEN 'media' THEN 1 WHEN 'baixa' THEN 2 ELSE 3 END ASC,
+      c.conta_id
+    LIMIT 1
+  `);
+  rows = (r as unknown as { rows?: Record<string, unknown>[] }).rows ?? (r as unknown as Record<string, unknown>[]);
+  if (rows.length > 0) return mapCard(rows[0], "frio", "Primeira abordagem");
+
+  return null;
+}
+
+function mapCard(row: Record<string, unknown>, origem: CardFila["origem"], porQue: string): CardFila {
+  return {
+    origem,
+    porQue,
+    contaId: Number(row.conta_id),
+    nome: String(row.nome),
+    cidade: (row.cidade as string) ?? null,
+    uf: (row.uf as string) ?? null,
+    tel: (row.tel as string) ?? null,
+    wa: (row.wa as string) ?? null,
+    funilStage: String(row.funil_stage),
+    requerHomol: Boolean(row.requer_homologacao),
+    statusHomol: (row.status_homologacao as string) ?? null,
+    requerCad: Boolean(row.requer_cadastro),
+    contatoPrincipal: (row.contato_principal as string) ?? null,
+    ultimaSituacao: (row.ultima_situacao as string) ?? null,
+    ultimaInteracaoEm: row.ultima_em ? new Date(row.ultima_em as string) : null,
+    ultimaInteracaoTexto: (row.ultima_texto as string) ?? null,
+    acaoId: row.acao_id ? Number(row.acao_id) : null,
+    acaoTipo: (row.acao_tipo as string) ?? null,
+    acaoDescricao: (row.acao_descricao as string) ?? null,
+    acaoDataPrevista: (row.acao_data as string) ?? null,
+  };
+}
+

@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck, Zap } from "lucide-react";
 
 const NAV = [
-  { href: "/equipe", label: "Equipe", icon: UsersRound },
+  { href: "/fila", label: "Fila do Dia", icon: Zap },
+  { href: "/equipe", label: "Equipe (lista)", icon: UsersRound },
   { href: "/agenda", label: "Agenda", icon: Calendar },
   { href: "/contas", label: "Contas", icon: Users },
   { href: "/compradores", label: "Compradores", icon: UserCircle },
