@@ -1,41 +1,26 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Users, Kanban, LayoutDashboard, Upload, LogOut, UsersRound, Settings, UserCircle, Calendar, Menu, X, ShieldCheck, Zap, Search, Activity, ClipboardList } from "lucide-react";
+import { LogOut, Menu, X, Zap, Kanban, Search } from "lucide-react";
 
-// NAV principal — 3 itens, o que a pessoa usa todo dia.
 const NAV = [
-  { href: "/fila", label: "Fila do Dia", icon: Zap },
-  { href: "/equipe", label: "Minhas atividades", icon: ClipboardList },
+  { href: "/acoes", label: "Minhas ações", icon: Zap },
+  { href: "/funil", label: "Funil", icon: Kanban },
   { href: "/buscar", label: "Buscar", icon: Search },
-];
-
-// Secundárias — consulta ocasional, colapsada por default
-const NAV_SECUNDARIA = [
-  { href: "/equipe?p=todos", label: "Visão do time", icon: UsersRound },
-  { href: "/agenda", label: "Agenda", icon: Calendar },
-  { href: "/contas", label: "Todas as contas", icon: Users },
-  { href: "/compradores", label: "Compradores", icon: UserCircle },
-  { href: "/pipeline", label: "Pipeline (kanban)", icon: Kanban },
-  { href: "/homologacoes", label: "Homologações", icon: ShieldCheck },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/importar", label: "Importar", icon: Upload },
 ];
 
 export function Sidebar({
   user,
-  isAdmin,
   signOutAction,
 }: {
   user: { name?: string | null; email?: string | null };
-  isAdmin: boolean;
+  isAdmin?: boolean;
   signOutAction: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      {/* Mobile menu button */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-30 bg-[#0D0D0D] text-white p-2 rounded-md shadow"
@@ -44,12 +29,10 @@ export function Sidebar({
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* Overlay mobile */}
       {open && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`
         bg-[#0D0D0D] text-[#F2F0EC] p-5 flex flex-col w-60 z-50
         fixed lg:static h-full
@@ -64,7 +47,7 @@ export function Sidebar({
           <X className="w-5 h-5" />
         </button>
 
-        <Link href="/equipe" className="flex items-center gap-2.5 mb-10" onClick={() => setOpen(false)}>
+        <Link href="/acoes" className="flex items-center gap-2.5 mb-10" onClick={() => setOpen(false)}>
           <div className="w-9 h-9 rounded-md bg-[#D4541A] flex items-center justify-center font-bold text-white" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
             C
           </div>
@@ -91,60 +74,12 @@ export function Sidebar({
               </Link>
             );
           })}
-          {isAdmin && (
-            <Link href="/pulso" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] text-sm transition-colors">
-              <Activity className="w-4 h-4" />
-              Pulso
-              <span className="text-[9px] text-[#6B6B6B] ml-auto">admin</span>
-            </Link>
-          )}
-
-          <details className="mt-4 pt-3 border-t border-[#2A2A2A] group">
-            <summary className="text-[10px] text-[#6B6B6B] uppercase tracking-wider px-3 mb-1 cursor-pointer hover:text-white list-none flex items-center gap-1">
-              <span className="group-open:rotate-90 transition-transform">▸</span> Outras telas
-            </summary>
-            <div className="mt-1">
-              {NAV_SECUNDARIA.map((n) => {
-                const Icon = n.icon;
-                return (
-                  <Link
-                    key={n.href}
-                    href={n.href}
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-[#1A1A1A] text-xs text-[#999] transition-colors"
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {n.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </details>
-
-          {isAdmin && (
-            <details className="mt-3 group">
-              <summary className="text-[10px] text-[#6B6B6B] uppercase tracking-wider px-3 mb-1 cursor-pointer hover:text-white list-none flex items-center gap-1">
-                <span className="group-open:rotate-90 transition-transform">▸</span> Admin
-              </summary>
-              <div className="mt-1">
-                <Link href="/admin/cadencias" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-[#1A1A1A] text-xs text-[#999] transition-colors">
-                  <Settings className="w-3.5 h-3.5" /> Cadências
-                </Link>
-                <Link href="/admin/atividade" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-[#1A1A1A] text-xs text-[#999] transition-colors">
-                  <Users className="w-3.5 h-3.5" /> Atividade equipe
-                </Link>
-              </div>
-            </details>
-          )}
         </nav>
 
         <div className="border-t border-[#2A2A2A] pt-4">
-          <div className="text-[10px] text-[#6B6B6B] uppercase tracking-wider mb-1">Logado como</div>
+          <div className="text-[10px] text-[#6B6B6B] uppercase tracking-wider mb-1">Logado</div>
           <div className="text-sm font-medium">{user.name}</div>
-          <div className="text-[10px] text-[#6B6B6B] mb-3 truncate">
-            {user.email}
-            {isAdmin && <span className="ml-1 text-[#D4541A]">· admin</span>}
-          </div>
+          <div className="text-[10px] text-[#6B6B6B] mb-3 truncate">{user.email}</div>
           <form action={signOutAction}>
             <button className="text-xs text-[#6B6B6B] hover:text-[#F2F0EC] flex items-center gap-1.5 transition-colors">
               <LogOut className="w-3 h-3" /> sair
