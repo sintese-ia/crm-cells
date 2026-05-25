@@ -123,6 +123,7 @@ export const acao = b2b.table("acao", {
   status: text("status").notNull().default("pendente"),
   concluidoEm: timestamp("concluido_em", { withTimezone: true }),
   notas: text("notas"),
+  origem: text("origem").default("manual"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

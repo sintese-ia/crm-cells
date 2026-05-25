@@ -228,6 +228,10 @@ export async function criarInteracao(
 
           const dataPrev = dados.dataPersonalizada || fmtISODate(addDays(new Date(), r.diasProximaAcao));
 
+          // Classifica origem: situações de primeiro-contato sem diálogo = frio
+          const SITUACOES_FRIAS = ["pc_nao_atendeu", "pc_caixa_postal", "pc_wa_sem_resposta", "pc_numero_invalido", "pc_adiou", "pc_nao_tem_interesse"];
+          const origem = SITUACOES_FRIAS.includes(dados.situacaoId) ? "cadencia_frio" : "cadencia_quente";
+
           await db.insert(acao).values({
             contaId,
             descricao: r.descricaoAcao,
@@ -235,6 +239,7 @@ export async function criarInteracao(
             dataPrevista: dataPrev,
             responsavel: responsavelValido,
             status: "pendente",
+            origem,
             notas: `Regra v1: ${dados.situacaoId} · tentativa ${tentativaNum}`,
           });
           acaoCriada = { dias: r.diasProximaAcao, descricao: r.descricaoAcao };

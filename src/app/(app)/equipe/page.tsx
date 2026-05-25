@@ -29,6 +29,7 @@ type DataAcao = {
   tel: string | null;
   wa: string | null;
   funilStage: string;
+  origem: string | null;
 };
 
 async function pegarAcoesAteSeteDias(pessoa: string): Promise<DataAcao[]> {
@@ -49,6 +50,7 @@ async function pegarAcoesAteSeteDias(pessoa: string): Promise<DataAcao[]> {
       tel: conta.telefoneInstitucional,
       wa: conta.whatsappInstitucional,
       funilStage: conta.funilStage,
+      origem: acao.origem,
     })
     .from(acao)
     .innerJoin(conta, eq(acao.contaId, conta.contaId))
@@ -163,7 +165,10 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
   const nWhatsappsHoje = whatsappsHoje[0]?.n ?? 0;
 
   const todasAcoes = await pegarAcoesAteSeteDias(ativa);
-  const atrasadas = todasAcoes.filter((a) => a.dataPrevista < hoje);
+  // Atrasadas: só conta as REAIS (cadencia_quente + manual). Atrasadas
+  // de cadência fria não viram dívida — quando passam da data, sistema
+  // converte em reabordagem D+30 (rodado em script à parte).
+  const atrasadas = todasAcoes.filter((a) => a.dataPrevista < hoje && a.origem !== "cadencia_frio" && a.origem !== "reabordagem_frio");
   const hojeAcoes = todasAcoes.filter((a) => a.dataPrevista === hoje);
   const proximas = todasAcoes.filter((a) => a.dataPrevista > hoje);
   const friosRows = await pegarFrios(ativa);
