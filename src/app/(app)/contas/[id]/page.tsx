@@ -320,7 +320,7 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
           )}
 
           {/* Inteligência do lead — só quando esquentou (funil >= visitado) */}
-          {["visitado", "proposta_enviada", "pedido_realizado", "positivado"].includes(c.funilStage) && (
+          {["reuniao", "em_negociacao", "pedido_realizado", "positivada"].includes(c.funilStage) && (
             <InteligenciaLead
               contaId={contaId}
               origem={c.origem}

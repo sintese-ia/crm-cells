@@ -42,7 +42,7 @@ export const conta = b2b.table("conta", {
   origemLead: text("origem_lead").notNull().default("prospeccao_propria"),
   origemLeadDetalhe: text("origem_lead_detalhe"),
   responsavel: text("responsavel").default("gabriel"),
-  funilStage: text("funil_stage").notNull().default("base_fria"),
+  funilStage: text("funil_stage").notNull().default("sem_contato"),
   temperatura: text("temperatura").notNull().default("frio"),
   motivoPerda: text("motivo_perda"),
   prioridadeCalc: text("prioridade_calc"),
@@ -150,14 +150,13 @@ export const CANAIS = [
 ] as const;
 
 export const FUNIL_STAGES = [
-  "base_fria",
-  "contatado",
-  "visitado",
-  "proposta_enviada",
-  "cadastrado_sem_pedido",
+  "sem_contato",
+  "contato_realizado",
+  "reuniao",
+  "em_negociacao",
   "pedido_realizado",
-  "positivado",
-  "perdido",
+  "positivada",
+  "negativa",
 ] as const;
 
 export const TEMPERATURAS = ["quente", "morno", "frio", "gelado"] as const;
@@ -174,13 +173,21 @@ export const ORIGENS = [
   "outro",
 ] as const;
 export const TIPOS_INTERACAO = [
-  "visita",
   "ligacao",
   "whatsapp",
   "email",
-  "proposta",
   "reuniao",
+  "proposta",
+  "cadastro",
   "amostra",
+  "fup",
+  "nota_boleto",
+  "entrega",
+  "despacho",
+  "treinamento",
+  "degustacao",
+  "negativa",
+  "visita",
   "outro",
 ] as const;
 export const TIPOS_ACAO = [

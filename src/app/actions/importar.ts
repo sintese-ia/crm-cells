@@ -31,11 +31,11 @@ const SEGMENTO_TO_CANAL: Record<string, string> = {
 };
 
 const ESTAGIO_TO_FUNIL: Record<string, string> = {
-  "Sem contato": "base_fria",
-  "Em negociação": "contatado",
-  "Reunião marcada": "visitado",
-  Positivada: "positivado",
-  Negativa: "perdido",
+  "Sem contato": "sem_contato",
+  "Em negociação": "em_negociacao",
+  "Reunião marcada": "reuniao",
+  Positivada: "positivada",
+  Negativa: "negativa",
 };
 
 const RESP_MAP: Record<string, string> = {
@@ -179,7 +179,7 @@ export async function importarMasterPlanilha(
       const segmento = (r[idxs.seg] || "Outros").trim();
       const canal = SEGMENTO_TO_CANAL[segmento] || "outros";
       const estagio = (r[idxs.estagio] || "").trim();
-      const funilStage = ESTAGIO_TO_FUNIL[estagio] || "base_fria";
+      const funilStage = ESTAGIO_TO_FUNIL[estagio] || "sem_contato";
 
       const respPlanilha = (r[idxs.resp] || "").trim();
       const responsavel = RESP_MAP[respPlanilha] || "gabriel";

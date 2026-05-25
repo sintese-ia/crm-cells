@@ -72,7 +72,7 @@ export function calcularJornada(
   const concluidoMarcar = reuMarcadasInt.length > 0;
   const concluidoRealizar = posReuInt.length > 0;
   const concluidoProposta = propostas.length > 0 || intsSorted.some((i) => i.situacaoId === "pr_positiva_aguard_proposta");
-  const concluidoFechar = fechadas.length > 0 || perdidas.length > 0 || ["positivado", "pedido_realizado", "perdido"].includes(fun);
+  const concluidoFechar = fechadas.length > 0 || perdidas.length > 0 || ["positivada", "pedido_realizado", "negativa"].includes(fun);
 
   const concluidas: Record<string, boolean> = {
     ligacao: concluidoLigacao,

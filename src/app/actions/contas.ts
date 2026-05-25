@@ -154,13 +154,13 @@ export async function criarInteracao(
       // Buscar situação pra ver se auto-move funil
       const [s] = await db.select().from(situacao).where(eq(situacao.situacaoId, dados.situacaoId));
 
-      // === BLOQUEIO: requer homologação E não aprovada bloqueia avanço pra venda ===
-      // Se o auto_funil dessa situação é positivado/pedido_realizado e a conta
-      // (ou sua matriz) requer homologação não aprovada, NÃO move funil — cria
-      // tarefa "Homologar rede X" pra responsável da matriz.
-      const VENDA_STAGES = ["positivado", "pedido_realizado", "proposta_enviada"];
+      // === SUGESTÃO (não bloqueio): GPS, não trilho ===
+      // Se conta requer homologação/cadastro mas não tem, e tá tentando avançar
+      // pra venda, AVISA + cria tarefa sugestiva (não impede o avanço).
+      // Filosofia: usuário decide; sistema só sinaliza fora de sequência.
+      const VENDA_STAGES = ["positivada", "pedido_realizado", "em_negociacao"];
       const tentandoAvancarVenda = s?.autoFunil && VENDA_STAGES.includes(s.autoFunil);
-      let bloqueadoPor: "homologacao" | "cadastro" | null = null;
+      const avisos: string[] = [];
       if (tentandoAvancarVenda) {
         const [contaCheia] = await db
           .select({
@@ -168,57 +168,56 @@ export async function criarInteracao(
             statusHom: conta.statusHomologacao,
             requerCad: conta.requerCadastro,
             matrizId: conta.contaMatrizId,
-            nome: conta.nome,
           })
           .from(conta)
           .where(eq(conta.contaId, contaId));
-        if (contaCheia?.requerHom && contaCheia.statusHom !== "aprovada") {
-          bloqueadoPor = "homologacao";
-        } else if (contaCheia?.requerCad) {
-          // Cadastro aprovado é registrado via interação cadastro_aprovado
-          // — se nunca houve, fica bloqueado
+        const faltaHom = contaCheia?.requerHom && contaCheia.statusHom !== "aprovada";
+        const faltaCad = contaCheia?.requerCad;
+        if (faltaCad) {
           const [cadOk] = await db
             .select({ n: count() })
             .from(interacao)
             .where(and(eq(interacao.contaId, contaId), eq(interacao.situacaoId, "cadastro_aprovado")));
-          if ((cadOk?.n ?? 0) === 0) bloqueadoPor = "cadastro";
+          if ((cadOk?.n ?? 0) > 0) { /* cadastrada ok */ }
+          else avisos.push("requer_cadastro: cadastro ainda não aprovado");
         }
-        if (bloqueadoPor) {
-          const alvoId = bloqueadoPor === "homologacao" && contaCheia?.matrizId ? contaCheia.matrizId : contaId;
+        if (faltaHom) avisos.push("requer_homologacao: matriz não aprovada");
+
+        // Cria tarefa sugestiva (sem bloquear o avanço)
+        if (avisos.length > 0) {
+          const alvoId = faltaHom && contaCheia?.matrizId ? contaCheia.matrizId : contaId;
           const [alvoConta] = await db.select({ nome: conta.nome, responsavel: conta.responsavel }).from(conta).where(eq(conta.contaId, alvoId));
           const respAlvo = ["gabriel","gabi","yasmin","ismael","lilian"].includes(alvoConta?.responsavel || "")
             ? (alvoConta!.responsavel as "gabriel"|"gabi"|"yasmin"|"ismael"|"lilian") : "gabriel";
-          // Cria ação na matriz/conta-alvo (se já não existe pendente)
           const jaTem = await db.select({ n: count() }).from(acao)
             .where(and(eq(acao.contaId, alvoId), eq(acao.status, "pendente"),
-              bloqueadoPor === "homologacao" ? sql`descricao ILIKE 'Homologar%'` : sql`descricao ILIKE 'Cadastrar%'`));
+              faltaHom ? sql`descricao ILIKE 'Homologar%'` : sql`descricao ILIKE 'Cadastrar%'`));
           if ((jaTem[0]?.n ?? 0) === 0) {
             await db.insert(acao).values({
               contaId: alvoId,
-              descricao: bloqueadoPor === "homologacao"
-                ? `Homologar ${alvoConta?.nome ?? "rede"} (bloqueia venda nas filhas)`
-                : `Cadastrar ${alvoConta?.nome ?? "conta"} (bloqueia venda)`,
+              descricao: faltaHom
+                ? `Homologar ${alvoConta?.nome ?? "rede"} (recomendado antes de fechar)`
+                : `Cadastrar ${alvoConta?.nome ?? "conta"} (recomendado antes de fechar)`,
               tipo: "follow_up",
               dataPrevista: fmtISODate(new Date()),
               responsavel: respAlvo,
               status: "pendente",
-              origem: "bloqueio_homol",
-              notas: `Auto-criada por bloqueio de ${bloqueadoPor} — disparado em conta ${contaId}`,
+              origem: "sugestao",
+              notas: `Sugerida por avanço pra ${s?.autoFunil} sem ${faltaHom ? "homologação" : "cadastro"} aprovado`,
             });
           }
-          // NÃO move funil — só registra que tentou
           await logAuditoria({
             contaId,
-            acao: "bloqueio_avanco",
+            acao: "avanco_com_aviso",
             campo: "funilStage",
             valorAntes: c?.funilStage ?? "",
-            valorDepois: `[bloqueado: ${bloqueadoPor}]`,
-            contexto: { motivo: `Avanço pra ${s.autoFunil} bloqueado — requer ${bloqueadoPor} aprovado` },
+            valorDepois: s?.autoFunil ?? "",
+            contexto: { avisos },
           });
         }
       }
 
-      if (s?.autoFunil && s.autoFunil !== c?.funilStage && !bloqueadoPor) {
+      if (s?.autoFunil && s.autoFunil !== c?.funilStage) {
         await db
           .update(conta)
           .set({ funilStage: s.autoFunil, updatedAt: new Date() })
@@ -270,6 +269,53 @@ export async function criarInteracao(
           .where(eq(conta.contaId, contaId));
       }
 
+      // === FULFILLMENT PARALELO: pedido_realizado cria 3 frentes ===
+      // Exceção da regra "uma ação por conta": fulfillment é checklist do pedido.
+      if (dados.situacaoId === "pedido_realizado") {
+        const respValido = ["gabriel","gabi","yasmin","ismael","lilian"].includes(c?.responsavel || "")
+          ? (c!.responsavel as "gabriel"|"gabi"|"yasmin"|"ismael"|"lilian") : "gabriel";
+        const fulfillment = [
+          { desc: "Emitir nota + boleto", dias: 1 },
+          { desc: "Agendar entrega", dias: 1 },
+          { desc: "Despachar pedido", dias: 1 },
+        ];
+        for (const f of fulfillment) {
+          await db.insert(acao).values({
+            contaId,
+            descricao: f.desc,
+            tipo: "outro",
+            dataPrevista: fmtISODate(addDays(new Date(), f.dias)),
+            responsavel: respValido,
+            status: "pendente",
+            origem: "fulfillment",
+            notas: "Fulfillment paralelo — 1 de 3 frentes do pedido",
+          });
+        }
+      }
+
+      // === PÓS-VENDA AUTOMÁTICO: despacho_realizado dispara trilha positivada ===
+      if (dados.situacaoId === "despacho_realizado") {
+        const respValido = ["gabriel","gabi","yasmin","ismael","lilian"].includes(c?.responsavel || "")
+          ? (c!.responsavel as "gabriel"|"gabi"|"yasmin"|"ismael"|"lilian") : "gabriel";
+        const posVenda = [
+          { d: 14, desc: "Treino sem.2 — exposição + treino com balconistas" },
+          { d: 30, desc: "Sellout inicial — checar primeira reposição" },
+          { d: 45, desc: "Degustação — agendar/realizar no PDV" },
+        ];
+        for (const p of posVenda) {
+          await db.insert(acao).values({
+            contaId,
+            descricao: p.desc,
+            tipo: "follow_up",
+            dataPrevista: fmtISODate(addDays(new Date(), p.d)),
+            responsavel: respValido,
+            status: "pendente",
+            origem: "pos_venda",
+            notas: "Pós-venda — trilha automática de positivada",
+          });
+        }
+      }
+
       // Buscar regra de cadência (situacaoId + tentativaNum)
       const regras = await db
         .select()
@@ -317,11 +363,16 @@ export async function criarInteracao(
 
         // criar nova ação (se dias_proxima_acao não é null)
         if (r.diasProximaAcao !== null) {
-          // Cancela pendentes anteriores (pra não empilhar)
+          // Cancela pendentes anteriores (pra não empilhar), EXCETO
+          // fulfillment e pos_venda que são checklists paralelos.
           await db
             .update(acao)
             .set({ status: "cancelado", updatedAt: new Date() })
-            .where(and(eq(acao.contaId, contaId), eq(acao.status, "pendente")));
+            .where(and(
+              eq(acao.contaId, contaId),
+              eq(acao.status, "pendente"),
+              sql`(${acao.origem} IS NULL OR ${acao.origem} NOT IN ('fulfillment','pos_venda'))`,
+            ));
 
           const responsavelValido = ["gabriel", "gabi", "yasmin", "ismael", "lilian"].includes(c?.responsavel || "")
             ? (c!.responsavel as "gabriel" | "gabi" | "yasmin" | "ismael" | "lilian")
@@ -629,7 +680,7 @@ export async function criarConta(dados: {
         emailInstitucional: dados.email ?? null,
         site: dados.site ?? null,
         responsavel: dados.responsavel,
-        funilStage: "base_fria",
+        funilStage: "sem_contato",
         origemLead: "prospeccao_propria",
       })
       .returning({ contaId: conta.contaId });
@@ -826,7 +877,7 @@ export async function getProximoCard(
            NULL::bigint AS acao_id, NULL::text AS acao_tipo, NULL::text AS acao_descricao, NULL::date AS acao_data
     FROM b2b.conta c
     WHERE c.responsavel = ${pessoa}
-      AND c.funil_stage IN ('visitado','proposta_enviada','pedido_realizado','positivado')
+      AND c.funil_stage IN ('reuniao','em_negociacao','pedido_realizado','positivada')
       AND (SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id=c.conta_id) < (NOW() - INTERVAL '15 days')
       AND NOT EXISTS (SELECT 1 FROM b2b.acao a WHERE a.conta_id=c.conta_id AND a.status='pendente')
       ${pulados.length > 0 ? sql`AND c.conta_id != ALL(${pulados}::bigint[])` : sql``}
@@ -862,7 +913,7 @@ export async function getProximoCard(
            NULL::bigint AS acao_id, NULL::text AS acao_tipo, NULL::text AS acao_descricao, NULL::date AS acao_data
     FROM b2b.conta c
     WHERE c.responsavel = ${pessoa}
-      AND c.funil_stage = 'base_fria'
+      AND c.funil_stage = 'sem_contato'
       AND c.conta_matriz_id IS NULL
       AND coalesce(c.prioridade_manual, c.prioridade_calc) != 'descartar'
       AND NOT EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id=c.conta_id)

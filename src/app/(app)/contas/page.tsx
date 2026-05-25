@@ -52,7 +52,7 @@ export default async function ContasPage({
   else if (sp.homologacao === "nao_aplica")
     filters.push(sql`c.requer_homologacao = false`);
   if (!incluirFilhas) {
-    filters.push(sql`(c.conta_matriz_id IS NULL OR c.funil_stage != 'base_fria' OR EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id))`);
+    filters.push(sql`(c.conta_matriz_id IS NULL OR c.funil_stage != 'sem_contato' OR EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id))`);
   }
 
   const where = filters.length ? sql.join(filters, sql` AND `) : undefined;

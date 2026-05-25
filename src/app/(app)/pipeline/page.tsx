@@ -32,7 +32,7 @@ export default async function PipelinePage({
   const byStage: Record<string, typeof contas> = {};
   for (const s of FUNIL_STAGES) byStage[s] = [];
   for (const c of contas) {
-    (byStage[c.funilStage] ?? byStage["base_fria"]).push(c);
+    (byStage[c.funilStage] ?? byStage["sem_contato"]).push(c);
   }
 
   return (

@@ -38,7 +38,7 @@ export default async function PulsoPage() {
       SELECT c.responsavel AS pessoa, count(*)::int n
       FROM b2b.conta c
       WHERE c.responsavel IS NOT NULL
-        AND c.funil_stage IN ('visitado','proposta_enviada','pedido_realizado','positivado')
+        AND c.funil_stage IN ('reuniao','em_negociacao','pedido_realizado','positivada')
         AND (SELECT max(i.ocorrido_em) FROM b2b.interacao i WHERE i.conta_id=c.conta_id) < (NOW() - INTERVAL '15 days')
       GROUP BY c.responsavel ORDER BY n DESC
     `)

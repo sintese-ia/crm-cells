@@ -18,7 +18,7 @@ export function calcTemperatura(
   const dias = Math.floor((Date.now() - last.getTime()) / (1000 * 60 * 60 * 24));
 
   // Em risco: funil quente (visitado em diante) + parado >15d
-  const funilQuente = ["visitado", "proposta_enviada", "pedido_realizado", "positivado"].includes(funilStage);
+  const funilQuente = ["reuniao", "em_negociacao", "pedido_realizado", "positivada"].includes(funilStage);
   if (funilQuente && dias > 15) return "em_risco";
 
   if (dias < 7) return "quente";

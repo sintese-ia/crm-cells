@@ -132,7 +132,8 @@ export function NovaInteracao({
                 ))}
               </select>
               <p className="text-xs text-[#6B6B6B] mt-1">
-                A situação determina a próxima ação automática (regras em /admin/cadencias)
+                Todas as situações disponíveis (filosofia GPS: pode pular etapas).
+                A situação determina a próxima ação automática.
               </p>
             </div>
 
@@ -156,7 +157,8 @@ export function NovaInteracao({
                 className="px-2 py-1.5 border border-[#E5E2DC] rounded text-sm bg-white"
               />
               <p className="text-xs text-[#6B6B6B] mt-1">
-                Se deixar vazio, o sistema calcula pela regra da situação.
+                Vazio = sistema calcula pela regra. Data futura = ação aparece na fila no dia.
+                Data passada = registro retroativo.
               </p>
             </div>
 

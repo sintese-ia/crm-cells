@@ -25,9 +25,9 @@ export default async function DashboardPage() {
       const [total, ligs, reus, neg, pos, fechados7d] = await Promise.all([
         db.select({ n: count() }).from(conta).where(eq(conta.responsavel, p)),
         db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, p), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, seteDiasAtras))),
-        db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, p), eq(conta.funilStage, "visitado"))),
-        db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, p), inArray(conta.funilStage, ["contatado", "proposta_enviada"]))),
-        db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, p), eq(conta.funilStage, "positivado"))),
+        db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, p), eq(conta.funilStage, "reuniao"))),
+        db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, p), inArray(conta.funilStage, ["contato_realizado", "em_negociacao"]))),
+        db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, p), eq(conta.funilStage, "positivada"))),
         // positivações nos últimos 30 dias = nova interação com situacaoId='ca_fechou' na janela
         db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, p), eq(interacao.situacaoId, "ca_fechou"), gte(interacao.ocorridoEm, trintaDiasAtras))),
       ]);
@@ -46,13 +46,13 @@ export default async function DashboardPage() {
   // Funil-shape conversão
   const f: Record<string, number> = {};
   for (const fs of funilStats) f[fs.stage] = fs.n;
-  const taxaContatadoVisitado = f["contatado"] ? Math.round((f["visitado"] / f["contatado"]) * 100) : 0;
-  const taxaVisitadoProposta = f["visitado"] ? Math.round((f["proposta_enviada"] / f["visitado"]) * 100) : 0;
-  const taxaPropostaPositivado = f["proposta_enviada"] ? Math.round((f["positivado"] / f["proposta_enviada"]) * 100) : 0;
+  const taxaContatadoVisitado = f["contato_realizado"] ? Math.round((f["reuniao"] / f["contato_realizado"]) * 100) : 0;
+  const taxaVisitadoProposta = f["reuniao"] ? Math.round((f["em_negociacao"] / f["reuniao"]) * 100) : 0;
+  const taxaPropostaPositivado = f["em_negociacao"] ? Math.round((f["positivada"] / f["em_negociacao"]) * 100) : 0;
 
   const totalContas = funilStats.reduce((a, x) => a + x.n, 0);
-  const positivadosTot = f["positivado"] ?? 0;
-  const propostasTot = f["proposta_enviada"] ?? 0;
+  const positivadosTot = f["positivada"] ?? 0;
+  const propostasTot = f["em_negociacao"] ?? 0;
 
   return (
     <div className="p-4 lg:p-8 max-w-6xl mx-auto">

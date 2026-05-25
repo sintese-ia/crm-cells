@@ -74,7 +74,7 @@ async function pegarFrios(pessoa: string) {
              (SELECT t FROM unnest(c.tags) t WHERE t LIKE 'rede:%' LIMIT 1) AS rede_tag
       FROM b2b.conta c
       WHERE c.responsavel = ${pessoa}
-        AND c.funil_stage = 'base_fria'
+        AND c.funil_stage = 'sem_contato'
         AND c.conta_matriz_id IS NULL
         AND coalesce(c.prioridade_manual, c.prioridade_calc) != 'descartar'
         AND NOT EXISTS (SELECT 1 FROM b2b.interacao i WHERE i.conta_id = c.conta_id)
@@ -157,9 +157,9 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
     db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, inicioDia))),
     db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "whatsapp"), gte(interacao.ocorridoEm, inicioDia))),
     db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, trintaDiasAtras))),
-    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "visitado"))),
-    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), inArray(conta.funilStage, ["contatado", "proposta_enviada"]))),
-    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "positivado"))),
+    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "reuniao"))),
+    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), inArray(conta.funilStage, ["contato_realizado", "em_negociacao"]))),
+    db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "positivada"))),
   ]);
   const nLigacoesHoje = ligacoesHoje[0]?.n ?? 0;
   const nWhatsappsHoje = whatsappsHoje[0]?.n ?? 0;

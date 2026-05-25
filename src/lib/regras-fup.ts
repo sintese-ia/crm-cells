@@ -98,7 +98,7 @@ export function sugerirProximaAcao(input: {
   // 2. POSITIVADA / Fechou / Comprou → trilha onboarding
   if (
     /posit|fechou|fechad|comprou|virou cliente|ativ[aá]/i.test(t) ||
-    funilStage === "positivado" ||
+    funilStage === "positivada" ||
     funilStage === "pedido_realizado"
   ) {
     return {
@@ -124,7 +124,7 @@ export function sugerirProximaAcao(input: {
     /negativ|n[ãa]o tem interess|n[ãa]o vai fazer|n[ãa]o vamos|recus|adia(?:d|r)|tratamento m[ée]dico|momento ruim/i.test(
       t
     ) ||
-    funilStage === "perdido"
+    funilStage === "negativa"
   ) {
     return {
       diasAFrente: 45,
