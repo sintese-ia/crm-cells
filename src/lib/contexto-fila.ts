@@ -33,6 +33,7 @@ const OPCOES: Record<ContextoFila, ResultadoOpcao[]> = {
   ],
   qualificando: [
     { sit: "rm_marcada",                  label: "Quer reunião",   tipo: "ligacao", cor: "verde" },
+    { sit: "amostra_enviada",             label: "Mandei amostra", tipo: "outro",   cor: "azul" },
     { sit: "pc_pediu_material",           label: "Pediu material", tipo: "ligacao", cor: "azul" },
     { sit: "pc_adiou",                    label: "Adiou",          tipo: "ligacao", cor: "amber" },
     { sit: "pc_nao_tem_interesse",        label: "Sem interesse",  tipo: "ligacao", cor: "vermelho" },

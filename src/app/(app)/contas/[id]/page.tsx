@@ -101,6 +101,14 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
                 ⚠️ sem contato
               </span>
             )}
+            {c.fupTravadoAte && new Date(c.fupTravadoAte) >= new Date() && (() => {
+              const diasRestantes = Math.ceil((new Date(c.fupTravadoAte).getTime() - Date.now()) / (1000*60*60*24));
+              return (
+                <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-[#0091EA] text-white" title="Amostra enviada — FUP travado até essa data">
+                  📦 amostra · feedback em {diasRestantes}d
+                </span>
+              );
+            })()}
           </div>
         </div>
 

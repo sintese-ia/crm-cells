@@ -71,6 +71,19 @@ export default async function PulsoPage() {
   );
   const totalFechou = fechamentos.reduce((a, x) => a + x.n, 0);
 
+  // 6. 📦 Amostras aguardando feedback — contas com FUP travado por amostra
+  const amostras = rows<{ pessoa: string; n: number }>(
+    await db.execute(sql`
+      SELECT c.responsavel AS pessoa, count(*)::int n
+      FROM b2b.conta c
+      WHERE c.fup_travado_ate IS NOT NULL
+        AND c.fup_travado_ate >= CURRENT_DATE - INTERVAL '14 days'
+        AND c.responsavel IS NOT NULL
+      GROUP BY c.responsavel ORDER BY n DESC
+    `)
+  );
+  const totalAmostras = amostras.reduce((a, x) => a + x.n, 0);
+
   const totalCallsHoje = callsHoje.reduce((a, x) => a + x.n, 0);
   const totalAvancou = avancaram.reduce((a, x) => a + x.n, 0);
 
@@ -127,6 +140,15 @@ export default async function PulsoPage() {
           quebra={fechamentos.map((c) => ({ k: c.pessoa, v: c.n }))}
           cor="bg-[#00897B]"
           subtitulo="contas que fecharam desde dia 1"
+        />
+
+        <MetricCard
+          icon="📦"
+          titulo="Amostras enviadas"
+          numero={totalAmostras}
+          quebra={amostras.map((c) => ({ k: c.pessoa, v: c.n }))}
+          cor="bg-[#0091EA]"
+          subtitulo="aguardando feedback (D+7 trava FUP)"
         />
       </div>
 
