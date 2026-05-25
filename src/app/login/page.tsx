@@ -1,22 +1,21 @@
-import { headers } from "next/headers";
+"use client";
+import { useEffect, useState } from "react";
 
-async function getCsrfToken(): Promise<string> {
-  const h = await headers();
-  const host = h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const res = await fetch(`${proto}://${host}/api/auth/csrf`, { cache: "no-store" });
-  const data = await res.json();
-  return data.csrfToken as string;
-}
+export default function LoginPage() {
+  const [csrf, setCsrf] = useState<string>("");
+  const [callbackUrl, setCallbackUrl] = useState<string>("/fila");
+  const [erro, setErro] = useState<string | null>(null);
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; callbackUrl?: string }>;
-}) {
-  const sp = await searchParams;
-  const csrfToken = await getCsrfToken();
-  const callbackUrl = sp?.callbackUrl || "/fila";
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("error")) setErro("Erro de login — tenta de novo");
+    if (sp.get("callbackUrl")) setCallbackUrl(sp.get("callbackUrl") as string);
+    // Fetch csrf NO CLIENT — assim o cookie csrf vai pro browser do user
+    // (server-side fetch não propaga cookies pro browser)
+    fetch("/api/auth/csrf", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setCsrf(d.csrfToken));
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F2F0EC]">
@@ -25,11 +24,14 @@ export default async function LoginPage({
         method="POST"
         className="w-[400px] bg-white rounded-lg border border-[#E5E2DC] p-10 shadow-sm"
       >
-        <input type="hidden" name="csrfToken" value={csrfToken} />
+        <input type="hidden" name="csrfToken" value={csrf} />
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
         <input type="hidden" name="senha" value="ignored" />
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-md bg-[#D4541A] flex items-center justify-center text-white font-bold" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
+          <div
+            className="w-10 h-10 rounded-md bg-[#D4541A] flex items-center justify-center text-white font-bold"
+            style={{ fontFamily: "'Alias Extended', sans-serif" }}
+          >
             C
           </div>
           <div>
@@ -52,13 +54,12 @@ export default async function LoginPage({
         </select>
         <button
           type="submit"
-          className="w-full bg-[#0D0D0D] text-white rounded-md py-2.5 text-sm font-medium hover:bg-[#1A1A1A] transition-colors"
+          disabled={!csrf}
+          className="w-full bg-[#0D0D0D] text-white rounded-md py-2.5 text-sm font-medium hover:bg-[#1A1A1A] transition-colors disabled:opacity-50"
         >
-          Entrar
+          {csrf ? "Entrar" : "carregando..."}
         </button>
-        {sp?.error ? (
-          <p className="text-[#D4541A] text-xs mt-3 text-center">Erro de login — tenta de novo</p>
-        ) : null}
+        {erro && <p className="text-[#D4541A] text-xs mt-3 text-center">{erro}</p>}
       </form>
     </div>
   );
