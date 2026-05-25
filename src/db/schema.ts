@@ -53,6 +53,7 @@ export const conta = b2b.table("conta", {
   homologacaoIniciadaEm: date("homologacao_iniciada_em"),
   homologacaoAprovadaEm: date("homologacao_aprovada_em"),
   homologacaoNotas: text("homologacao_notas"),
+  requerCadastro: boolean("requer_cadastro").notNull().default(false),
   fupTravadoAte: date("fup_travado_ate"),
   notas: text("notas"),
   clickupTaskId: text("clickup_task_id").unique(),

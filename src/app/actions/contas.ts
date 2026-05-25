@@ -153,7 +153,72 @@ export async function criarInteracao(
     if (dados.situacaoId) {
       // Buscar situação pra ver se auto-move funil
       const [s] = await db.select().from(situacao).where(eq(situacao.situacaoId, dados.situacaoId));
-      if (s?.autoFunil && s.autoFunil !== c?.funilStage) {
+
+      // === BLOQUEIO: requer homologação E não aprovada bloqueia avanço pra venda ===
+      // Se o auto_funil dessa situação é positivado/pedido_realizado e a conta
+      // (ou sua matriz) requer homologação não aprovada, NÃO move funil — cria
+      // tarefa "Homologar rede X" pra responsável da matriz.
+      const VENDA_STAGES = ["positivado", "pedido_realizado", "proposta_enviada"];
+      const tentandoAvancarVenda = s?.autoFunil && VENDA_STAGES.includes(s.autoFunil);
+      let bloqueadoPor: "homologacao" | "cadastro" | null = null;
+      if (tentandoAvancarVenda) {
+        const [contaCheia] = await db
+          .select({
+            requerHom: conta.requerHomologacao,
+            statusHom: conta.statusHomologacao,
+            requerCad: conta.requerCadastro,
+            matrizId: conta.contaMatrizId,
+            nome: conta.nome,
+          })
+          .from(conta)
+          .where(eq(conta.contaId, contaId));
+        if (contaCheia?.requerHom && contaCheia.statusHom !== "aprovada") {
+          bloqueadoPor = "homologacao";
+        } else if (contaCheia?.requerCad) {
+          // Cadastro aprovado é registrado via interação cadastro_aprovado
+          // — se nunca houve, fica bloqueado
+          const [cadOk] = await db
+            .select({ n: count() })
+            .from(interacao)
+            .where(and(eq(interacao.contaId, contaId), eq(interacao.situacaoId, "cadastro_aprovado")));
+          if ((cadOk?.n ?? 0) === 0) bloqueadoPor = "cadastro";
+        }
+        if (bloqueadoPor) {
+          const alvoId = bloqueadoPor === "homologacao" && contaCheia?.matrizId ? contaCheia.matrizId : contaId;
+          const [alvoConta] = await db.select({ nome: conta.nome, responsavel: conta.responsavel }).from(conta).where(eq(conta.contaId, alvoId));
+          const respAlvo = ["gabriel","gabi","yasmin","ismael","lilian"].includes(alvoConta?.responsavel || "")
+            ? (alvoConta!.responsavel as "gabriel"|"gabi"|"yasmin"|"ismael"|"lilian") : "gabriel";
+          // Cria ação na matriz/conta-alvo (se já não existe pendente)
+          const jaTem = await db.select({ n: count() }).from(acao)
+            .where(and(eq(acao.contaId, alvoId), eq(acao.status, "pendente"),
+              bloqueadoPor === "homologacao" ? sql`descricao ILIKE 'Homologar%'` : sql`descricao ILIKE 'Cadastrar%'`));
+          if ((jaTem[0]?.n ?? 0) === 0) {
+            await db.insert(acao).values({
+              contaId: alvoId,
+              descricao: bloqueadoPor === "homologacao"
+                ? `Homologar ${alvoConta?.nome ?? "rede"} (bloqueia venda nas filhas)`
+                : `Cadastrar ${alvoConta?.nome ?? "conta"} (bloqueia venda)`,
+              tipo: "follow_up",
+              dataPrevista: fmtISODate(new Date()),
+              responsavel: respAlvo,
+              status: "pendente",
+              origem: "bloqueio_homol",
+              notas: `Auto-criada por bloqueio de ${bloqueadoPor} — disparado em conta ${contaId}`,
+            });
+          }
+          // NÃO move funil — só registra que tentou
+          await logAuditoria({
+            contaId,
+            acao: "bloqueio_avanco",
+            campo: "funilStage",
+            valorAntes: c?.funilStage ?? "",
+            valorDepois: `[bloqueado: ${bloqueadoPor}]`,
+            contexto: { motivo: `Avanço pra ${s.autoFunil} bloqueado — requer ${bloqueadoPor} aprovado` },
+          });
+        }
+      }
+
+      if (s?.autoFunil && s.autoFunil !== c?.funilStage && !bloqueadoPor) {
         await db
           .update(conta)
           .set({ funilStage: s.autoFunil, updatedAt: new Date() })
@@ -167,6 +232,42 @@ export async function criarInteracao(
           valorDepois: s.autoFunil,
           contexto: { motivo: `Situação "${s.label}"` },
         });
+      }
+
+      // === PROPAGAÇÃO HOMOLOGAÇÃO matriz → filhas ===
+      if (dados.situacaoId === "homologacao_aprovada") {
+        const hoje = fmtISODate(new Date());
+        // Marcar a própria conta como aprovada
+        await db.update(conta)
+          .set({ statusHomologacao: "aprovada", homologacaoAprovadaEm: hoje, updatedAt: new Date() })
+          .where(eq(conta.contaId, contaId));
+        // Se for matriz com filhas: propagar
+        const filhas = await db.select({ id: conta.contaId, nome: conta.nome }).from(conta).where(eq(conta.contaMatrizId, contaId));
+        if (filhas.length > 0) {
+          await db.update(conta)
+            .set({ statusHomologacao: "aprovada", homologacaoAprovadaEm: hoje, homologacaoNotas: sql`COALESCE(homologacao_notas, '') || E'\\nHerdou aprovação da matriz em ' || ${hoje}`, updatedAt: new Date() })
+            .where(eq(conta.contaMatrizId, contaId));
+          // Cancela ações de bloqueio nas filhas
+          await db.update(acao)
+            .set({ status: "cancelado", updatedAt: new Date() })
+            .where(and(eq(acao.status, "pendente"), sql`conta_id IN (SELECT conta_id FROM b2b.conta WHERE conta_matriz_id = ${contaId})`, sql`origem = 'bloqueio_homol'`));
+          for (const f of filhas) {
+            await logAuditoria({
+              contaId: f.id,
+              acao: "homologacao_herdada",
+              valorDepois: `aprovada via matriz ${contaId}`,
+              contexto: { matriz_id: contaId },
+            });
+          }
+        }
+      } else if (dados.situacaoId === "homologacao_docs_enviados") {
+        await db.update(conta)
+          .set({ statusHomologacao: "docs_enviados", homologacaoIniciadaEm: fmtISODate(new Date()), updatedAt: new Date() })
+          .where(eq(conta.contaId, contaId));
+      } else if (dados.situacaoId === "homologacao_reprovada") {
+        await db.update(conta)
+          .set({ statusHomologacao: "reprovada", updatedAt: new Date() })
+          .where(eq(conta.contaId, contaId));
       }
 
       // Buscar regra de cadência (situacaoId + tentativaNum)
