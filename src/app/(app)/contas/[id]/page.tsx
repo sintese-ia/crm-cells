@@ -8,7 +8,6 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { EditarConta } from "./_components/editar-conta";
 import { NovaInteracao } from "./_components/nova-interacao";
-import { ProximaAcao } from "./_components/proxima-acao";
 import { JornadaCard } from "./_components/jornada";
 import { calcularJornada } from "@/lib/jornada";
 import { QuickActions } from "@/components/quick-actions";
@@ -111,8 +110,6 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
           contatos={contatos}
           situacoes={situacoes}
         />
-
-        {proximaAcao && <ProximaAcao acao={proximaAcao} />}
 
         <div className="mt-4">
           <HomologacaoCard
