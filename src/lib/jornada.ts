@@ -64,12 +64,14 @@ export function calcularJornada(
       i.situacaoId === "pr_negativa"
   );
 
-  // Concluído?
+  // Concluído? Exige interação REAL no CRM (não basta funil_stage da planilha
+  // dizer que houve proposta — sem interação registrada, mostrar etapa vazia).
+  // Exceção: fechar/perdido — funil é fonte autoritária pra estado terminal.
   const concluidoLigacao = ligacoes.length > 0;
   const concluidoWA = whatsapps.length > 0;
-  const concluidoMarcar = reuMarcadasInt.length > 0 || ["visitado", "proposta_enviada", "pedido_realizado", "positivado"].includes(fun);
-  const concluidoRealizar = posReuInt.length > 0 || ["proposta_enviada", "pedido_realizado", "positivado"].includes(fun);
-  const concluidoProposta = propostas.length > 0 || ["proposta_enviada", "pedido_realizado", "positivado"].includes(fun) || intsSorted.some((i) => i.situacaoId === "pr_positiva_aguard_proposta");
+  const concluidoMarcar = reuMarcadasInt.length > 0;
+  const concluidoRealizar = posReuInt.length > 0;
+  const concluidoProposta = propostas.length > 0 || intsSorted.some((i) => i.situacaoId === "pr_positiva_aguard_proposta");
   const concluidoFechar = fechadas.length > 0 || perdidas.length > 0 || ["positivado", "pedido_realizado", "perdido"].includes(fun);
 
   const concluidas: Record<string, boolean> = {
