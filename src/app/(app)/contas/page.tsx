@@ -172,6 +172,7 @@ export default async function ContasPage({
                 {ehMatriz && <span className="text-[10px] bg-[#0D0D0D] text-white px-1.5 rounded">🏢 matriz · {row.n_filhas} lojas</span>}
                 {row.conta_matriz_id && <span className="text-[10px] text-[#0091EA] uppercase">unidade</span>}
                 {revisarContato && <span className="text-[10px] bg-[#FFB300] text-white px-1.5 rounded">⚠️ sem comprador</span>}
+                {(row.n_contatos ?? 0) === 0 && !revisarContato && <span className="text-[10px] bg-[#FFB300] text-[#0D0D0D] px-1.5 rounded">⚠️ sem contato</span>}
                 <HomologacaoBadge requer={Boolean(row.requer_homologacao)} status={row.status_homologacao} />
                 {parado14 && <span className="text-[#BF360C] text-[10px] font-bold">⚠️ {dias}d</span>}
               </div>
@@ -230,6 +231,9 @@ export default async function ContasPage({
                     )}
                     {revisarContato && (
                       <span className="ml-2 text-[10px] bg-[#FFB300] text-white px-1.5 py-0.5 rounded">⚠️ s/ comprador</span>
+                    )}
+                    {(row.n_contatos ?? 0) === 0 && !revisarContato && (
+                      <span className="ml-2 text-[10px] bg-[#FFB300] text-[#0D0D0D] px-1.5 py-0.5 rounded">⚠️ sem contato</span>
                     )}
                     <span className="ml-2">
                       <HomologacaoBadge requer={Boolean(row.requer_homologacao)} status={row.status_homologacao} size="md" />

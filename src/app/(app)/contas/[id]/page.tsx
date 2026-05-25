@@ -2,7 +2,8 @@ import { db } from "@/db";
 import { conta, contato, interacao, acao, situacao, auditoria } from "@/db/schema";
 import { eq, desc, and, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { FUNIL_LABEL, FUNIL_COLOR, TEMP_COLOR, CANAL_LABEL } from "@/lib/labels";
+import { FUNIL_LABEL, FUNIL_COLOR, CANAL_LABEL } from "@/lib/labels";
+import { calcTemperatura, TEMP_COR, TEMP_LABEL } from "@/lib/temperatura";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { EditarConta } from "./_components/editar-conta";
@@ -86,10 +87,20 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
             <span className={`text-white text-xs px-3 py-1 rounded font-medium ${FUNIL_COLOR[c.funilStage] || "bg-zinc-400"}`}>
               {FUNIL_LABEL[c.funilStage] || c.funilStage}
             </span>
-            <span className="flex items-center gap-1.5 text-xs px-3 py-1 rounded border border-[#E5E2DC]">
-              <span className={`w-2 h-2 rounded-full ${TEMP_COLOR[c.temperatura] || "bg-zinc-400"}`} />
-              {c.temperatura}
-            </span>
+            {(() => {
+              const tDeriv = calcTemperatura(c.funilStage, interacoes[0]?.ocorridoEm);
+              return (
+                <span className="flex items-center gap-1.5 text-xs px-3 py-1 rounded border border-[#E5E2DC]" title="Calculada automaticamente (última interação + funil)">
+                  <span className={`w-2 h-2 rounded-full ${TEMP_COR[tDeriv]}`} />
+                  {TEMP_LABEL[tDeriv]}
+                </span>
+              );
+            })()}
+            {contatos.length === 0 && (
+              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-[#FFB300] text-[#0D0D0D]" title="Esta conta não tem nenhum comprador registrado">
+                ⚠️ sem contato
+              </span>
+            )}
           </div>
         </div>
 
