@@ -100,6 +100,7 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
   const ativa = pParam === "todos" ? "todos" : (PESSOAS.find((x) => x.id === pParam)?.id ?? userId);
 
   const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
   const inicioSemana = new Date(); inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay()); inicioSemana.setHours(0, 0, 0, 0);
@@ -153,7 +154,7 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
   const [ligacoesHoje, whatsappsHoje, ligacoesSemana, reuMarcadas, emNeg, positivados] = await Promise.all([
     db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, inicioDia))),
     db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "whatsapp"), gte(interacao.ocorridoEm, inicioDia))),
-    db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, seteDiasAtras))),
+    db.select({ n: count() }).from(interacao).where(and(eq(interacao.autor, ativa), eq(interacao.tipo, "ligacao"), gte(interacao.ocorridoEm, trintaDiasAtras))),
     db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "visitado"))),
     db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), inArray(conta.funilStage, ["contatado", "proposta_enviada"]))),
     db.select({ n: count() }).from(conta).where(and(eq(conta.responsavel, ativa), eq(conta.funilStage, "positivado"))),
@@ -199,7 +200,7 @@ export default async function EquipePage({ searchParams }: { searchParams: Promi
       <MetaCallsBar feito={nLigacoesHoje} meta={metaCalls} whatsappsHoje={nWhatsappsHoje} />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 lg:gap-3 mb-6 lg:mb-8">
-        <StatCard label="📞 Ligações 7d" valor={ligacoesSemana[0]?.n ?? 0} />
+        <StatCard label="📞 Ligações 30d" valor={ligacoesSemana[0]?.n ?? 0} />
         <StatCard label="💬 WA hoje" valor={nWhatsappsHoje} />
         <StatCard label="📅 Reuniões marcadas" valor={reuMarcadas[0]?.n ?? 0} />
         <StatCard label="🤝 Em negociação" valor={emNeg[0]?.n ?? 0} />
