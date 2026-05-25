@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { conta, FUNIL_STAGES, RESPONSAVEIS } from "@/db/schema";
-import { sql, isNull, and, eq } from "drizzle-orm";
+import { isNull, and, eq, desc } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
     responsavel: conta.responsavel,
     tipo: conta.tipo,
     n_lojas: conta.nLojas,
-  }).from(conta).where(where).orderBy(sql`c.updated_at DESC`.append(sql``)).limit(500);
+  }).from(conta).where(where).orderBy(desc(conta.updatedAt)).limit(500);
 
   const byStage: Record<string, CardConta[]> = {};
   for (const s of FUNIL_STAGES) byStage[s] = [];
