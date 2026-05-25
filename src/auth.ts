@@ -19,11 +19,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         senha: { label: "Senha", type: "password" },
       },
       authorize: async (creds) => {
-        const u = USUARIOS.find(
-          (x) =>
-            x.email === String(creds?.email || "").toLowerCase() &&
-            x.senha === String(creds?.senha || "")
-        );
+        // Sem senha: CRM interno, 3 usuários fixos, escopo restrito.
+        // Email é suficiente pra identificar quem é.
+        const email = String(creds?.email || "").toLowerCase().trim();
+        const u = USUARIOS.find((x) => x.email === email);
         if (!u) return null;
         return { id: u.id, name: u.nome, email: u.email };
       },
