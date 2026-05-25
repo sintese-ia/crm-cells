@@ -203,6 +203,17 @@ export async function criarInteracao(
           });
         }
 
+        // Amostra enviada: trava FUP por 7 dias (não permite outras
+        // cadências competirem nesse período). A própria amostra cria
+        // ação D+7 "Confirmar recebimento", então o lead não é esquecido.
+        if (dados.situacaoId === "amostra_enviada") {
+          const ate = fmtISODate(addDays(new Date(), 7));
+          await db
+            .update(conta)
+            .set({ fupTravadoAte: ate, updatedAt: new Date() })
+            .where(eq(conta.contaId, contaId));
+        }
+
         // criar nova ação (se dias_proxima_acao não é null)
         if (r.diasProximaAcao !== null) {
           // Cancela pendentes anteriores (pra não empilhar)
@@ -224,7 +235,7 @@ export async function criarInteracao(
             dataPrevista: dataPrev,
             responsavel: responsavelValido,
             status: "pendente",
-            notas: `Regra: ${dados.situacaoId} · tentativa ${tentativaNum}`,
+            notas: `Regra v1: ${dados.situacaoId} · tentativa ${tentativaNum}`,
           });
           acaoCriada = { dias: r.diasProximaAcao, descricao: r.descricaoAcao };
         }
