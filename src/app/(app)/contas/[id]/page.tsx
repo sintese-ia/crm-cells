@@ -127,37 +127,70 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
               </h2>
               <NovaInteracao contaId={contaId} contatos={contatos} situacoes={situacoes} />
             </div>
-            {interacoes.length === 0 ? (
-              <p className="text-sm text-[#6B6B6B] py-6 text-center">Nenhuma interação registrada ainda.</p>
-            ) : (
-              <div className="space-y-3">
-                {interacoes.map((i) => {
-                  const sit = i.situacaoId ? sitMap[i.situacaoId] : null;
-                  return (
-                    <div key={i.interacaoId} className="border-l-2 border-[#E5E2DC] pl-4 py-1">
-                      <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-1 flex-wrap">
-                        <span className="font-medium uppercase">{i.tipo}</span>
-                        {sit && (
-                          <span className="bg-[#F2F0EC] px-2 py-0.5 rounded text-[#0D0D0D]">
-                            {sit.icon} {sit.label}
-                            {i.tentativaNum && i.tentativaNum > 1 && (
-                              <span className="ml-1 text-[#D4541A]">· {i.tentativaNum}ª vez</span>
+            {(() => {
+              type TimelineItem =
+                | { kind: "inter"; data: Date; payload: typeof interacoes[number] }
+                | { kind: "acao"; data: Date; payload: typeof acoesPendentes[number] };
+              const items: TimelineItem[] = [
+                ...interacoes.map<TimelineItem>((i) => ({ kind: "inter", data: new Date(i.ocorridoEm), payload: i })),
+                ...acoesPendentes.map<TimelineItem>((a) => ({ kind: "acao", data: new Date(a.dataPrevista + "T12:00"), payload: a })),
+              ].sort((a, b) => b.data.getTime() - a.data.getTime());
+              const hoje = new Date().toISOString().slice(0, 10);
+              if (items.length === 0) {
+                return <p className="text-sm text-[#6B6B6B] py-6 text-center">Nenhuma interação registrada ainda.</p>;
+              }
+              return (
+                <div className="space-y-3">
+                  {items.map((it) => {
+                    if (it.kind === "inter") {
+                      const i = it.payload;
+                      const sit = i.situacaoId ? sitMap[i.situacaoId] : null;
+                      return (
+                        <div key={`i${i.interacaoId}`} className="border-l-2 border-[#E5E2DC] pl-4 py-1">
+                          <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-1 flex-wrap">
+                            <span className="font-medium uppercase">{i.tipo}</span>
+                            {sit && (
+                              <span className="bg-[#F2F0EC] px-2 py-0.5 rounded text-[#0D0D0D]">
+                                {sit.icon} {sit.label}
+                                {i.tentativaNum && i.tentativaNum > 1 && (
+                                  <span className="ml-1 text-[#D4541A]">· {i.tentativaNum}ª vez</span>
+                                )}
+                              </span>
                             )}
+                            <span>·</span>
+                            <span>{i.autor}</span>
+                            <span>·</span>
+                            <span>{new Date(i.ocorridoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+                          </div>
+                          {i.texto && <div className="text-sm whitespace-pre-wrap">{i.texto}</div>}
+                        </div>
+                      );
+                    }
+                    // Ação prevista (pendente)
+                    const a = it.payload;
+                    const atrasada = a.dataPrevista < hoje;
+                    const ehHoje = a.dataPrevista === hoje;
+                    const borda = atrasada ? "border-l-2 border-dashed border-[#BF360C] bg-[#FFF7F0]" : ehHoje ? "border-l-2 border-dashed border-[#D4541A] bg-[#FFF7F0]" : "border-l-2 border-dashed border-[#0091EA] bg-[#F0F8FF]";
+                    return (
+                      <div key={`a${a.acaoId}`} className={`pl-4 py-2 rounded-r ${borda}`}>
+                        <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-1 flex-wrap">
+                          <span className="font-medium uppercase text-[#0091EA]">📅 {atrasada ? "ATRASADA" : ehHoje ? "PREVISTA HOJE" : "PREVISTA"}</span>
+                          <span className="bg-white border border-[#E5E2DC] px-2 py-0.5 rounded text-[#0D0D0D]">{a.tipo}</span>
+                          <span>·</span>
+                          <span>{a.responsavel}</span>
+                          <span>·</span>
+                          <span className={atrasada ? "text-[#BF360C] font-medium" : ""}>
+                            {new Date(a.dataPrevista + "T12:00").toLocaleDateString("pt-BR")}
                           </span>
-                        )}
-                        <span>·</span>
-                        <span>{i.autor}</span>
-                        <span>·</span>
-                        <span>
-                          {new Date(i.ocorridoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
-                        </span>
+                        </div>
+                        <div className="text-sm">{a.descricao}</div>
+                        {a.notas && <div className="text-xs text-[#6B6B6B] mt-0.5 italic">{a.notas}</div>}
                       </div>
-                      {i.texto && <div className="text-sm whitespace-pre-wrap">{i.texto}</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </section>
 
           {audits.length > 0 && (
