@@ -202,12 +202,16 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
             })()}
           </section>
 
+          {/* Histórico de alterações fica colapsado — é audit técnico,
+              não é "interação com a conta". Timeline acima é a fonte única
+              do que aconteceu e o que vai acontecer. */}
           {audits.length > 0 && (
-            <section className="bg-white border border-[#E5E2DC] rounded-lg p-6">
-              <h2 className="font-bold mb-4" style={{ fontFamily: "'Alias Extended', sans-serif" }}>
-                Histórico de alterações
-              </h2>
-              <div className="space-y-2 text-xs">
+            <details className="bg-white border border-[#E5E2DC] rounded-lg group">
+              <summary className="p-4 cursor-pointer text-xs text-[#6B6B6B] hover:text-[#0D0D0D] list-none flex items-center gap-2">
+                <span className="group-open:rotate-90 transition-transform">▸</span>
+                Histórico técnico de alterações ({audits.length} eventos) · só admin
+              </summary>
+              <div className="px-4 pb-4 space-y-2 text-xs">
                 {audits.map((a) => (
                   <div key={a.auditoriaId} className="flex gap-3 py-1 border-b border-[#F2F0EC] last:border-0">
                     <span className="text-[#6B6B6B] font-mono whitespace-nowrap">
@@ -225,7 +229,7 @@ export default async function ContaDetail({ params }: { params: Promise<{ id: st
                   </div>
                 ))}
               </div>
-            </section>
+            </details>
           )}
         </div>
 
