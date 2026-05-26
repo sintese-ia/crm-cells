@@ -18,6 +18,15 @@ import { randomUUID } from "crypto";
 const CANAIS_PAR = ["ligacao", "whatsapp"] as const;
 // Situações "tentativa falhou" — só essas mantêm a perna parceira pendente.
 const SITUACOES_TENTATIVA_FALHA = ["lig_nao_atendeu", "wa_nao_respondeu"] as const;
+// Quando QUALQUER uma dessas é registrada, a conta vira do Gabriel
+// (ele que conduz reunião → proposta → FUP da venda).
+const SITUACOES_TRANSFERIR_GABRIEL = [
+  "lig_reuniao_agendada",
+  "wa_reuniao_agendada",
+  "reuniao_agendada",
+  "reuniao_realizada",
+  "reuniao_adiada",
+] as const;
 
 function fmtISODate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -203,6 +212,14 @@ export async function criarInteracao(
         }
         await db.update(conta).set({ funilStage: s.autoFunil, updatedAt: new Date() }).where(eq(conta.contaId, contaId));
         funilMovido = { de: c?.funilStage ?? "", para: s.autoFunil };
+      }
+
+      // Reunião marcada/realizada → transfere conta pro Gabriel
+      // (ele conduz reunião → proposta → FUP da venda).
+      if ((SITUACOES_TRANSFERIR_GABRIEL as readonly string[]).includes(dados.situacaoId)) {
+        if (c?.responsavel !== "gabriel") {
+          await db.update(conta).set({ responsavel: "gabriel", updatedAt: new Date() }).where(eq(conta.contaId, contaId));
+        }
       }
 
       // Amostra trava FUP 7d
