@@ -4,10 +4,10 @@ import Link from "next/link";
 import { atualizarConta, criarInteracao, criarContato, marcarAcaoFeita } from "@/app/actions/contas";
 import {
   type Conta, type Contato, type Interacao, type Situacao,
-  CANAIS, TIPOS_CONTA, FUNIL_STAGES, RESPONSAVEIS, TIPOS_INTERACAO,
+  CANAIS, TIPOS_CONTA, FUNIL_STAGES, RESPONSAVEIS,
 } from "@/db/schema";
 import { toast } from "sonner";
-import { Phone, MessageCircle, Globe, Mail, AtSign, Plus } from "lucide-react";
+import { Phone, MessageCircle, Globe, Mail, AtSign, Plus, Users, FileText, MapPin, MoreHorizontal, ArrowLeft, ShoppingCart, Ban } from "lucide-react";
 
 const FUNIL_LABEL: Record<string, string> = {
   sem_contato: "Sem contato",
@@ -40,6 +40,47 @@ const CANAL_LABEL: Record<string, string> = {
   vending_machine: "Vending machine",
   outros: "Outros",
 };
+
+// Modal Nova interação — Tipo enxuto (manual) + Situação filtrada pelo Tipo.
+// Os 9 tipos automáticos (amostra, cadastro, nota_boleto, entrega, despacho,
+// treinamento, degustacao, fup, negativa) NÃO aparecem aqui — eles entram via
+// cadência/fulfillment/pos-venda. "Outro" é o escape pra registrar manualmente
+// uma situação fora do fluxo normal.
+const MANUAL_TIPOS = [
+  { id: "ligacao",  label: "Ligação",  Icon: Phone },
+  { id: "whatsapp", label: "WhatsApp", Icon: MessageCircle },
+  { id: "email",    label: "E-mail",   Icon: Mail },
+  { id: "reuniao",  label: "Reunião",  Icon: Users },
+  { id: "proposta", label: "Proposta", Icon: FileText },
+  { id: "visita",   label: "Visita",   Icon: MapPin },
+  { id: "outro",    label: "Outro",    Icon: MoreHorizontal },
+] as const;
+
+// Situações específicas de cada tipo (por prefixo do situacao_id).
+const SITUACOES_POR_TIPO: Record<string, string[]> = {
+  ligacao:  ["lig_atendeu", "lig_nao_atendeu", "lig_reuniao_agendada"],
+  whatsapp: ["wa_respondeu", "wa_nao_respondeu", "wa_reuniao_agendada"],
+  email:    [],
+  reuniao:  ["reuniao_realizada", "reuniao_adiada", "reuniao_cancelada", "reuniao_agendada"],
+  proposta: ["proposta_enviada"],
+  visita:   [],
+  outro:    [], // fallback: mostra todas (escape hatch)
+};
+
+// Transversal — qualquer canal pode fechar venda.
+const TRANSVERSAL_PEDIDO = "pedido_realizado";
+
+// Drill-in de Negativa (8 motivos).
+const NEGATIVA_MOTIVOS = [
+  "negativa_margem",
+  "negativa_preco",
+  "negativa_gondola",
+  "negativa_concorrente",
+  "negativa_sem_interesse",
+  "negativa_pedido_minimo",
+  "negativa_giro",
+  "negativa_outro",
+];
 
 export function CardConta({
   conta: c, contatos, interacoes, situacoes, filhas, matriz,
@@ -331,17 +372,43 @@ function ModalNovaInteracao({
   onClose: () => void;
 }) {
   const [pending, start] = useTransition();
-  const [tipo, setTipo] = useState("ligacao");
+  const [tipo, setTipo] = useState<string>("ligacao");
   const [situacaoId, setSit] = useState("");
   const [data, setData] = useState("");
   const [texto, setTexto] = useState("");
   const [contatoId, setContatoId] = useState("");
   const [lojaId, setLojaId] = useState("");
+  const [negativaOpen, setNegativaOpen] = useState(false);
 
-  const sitsAgrupadas: Record<string, Situacao[]> = {};
-  for (const s of situacoes) {
-    if (!sitsAgrupadas[s.estagio]) sitsAgrupadas[s.estagio] = [];
-    sitsAgrupadas[s.estagio].push(s);
+  const sitMap: Record<string, Situacao> = Object.fromEntries(
+    situacoes.map((s) => [s.situacaoId, s])
+  );
+  const sitsTipo = (SITUACOES_POR_TIPO[tipo] ?? []).map((id) => sitMap[id]).filter(Boolean);
+  const pedidoSit = sitMap[TRANSVERSAL_PEDIDO];
+  const motivosNeg = NEGATIVA_MOTIVOS.map((id) => sitMap[id]).filter(Boolean);
+
+  // Para "Outro": mostra todas agrupadas por estágio como escape pro caso manual.
+  const sitsByEstagio: Record<string, Situacao[]> = {};
+  if (tipo === "outro") {
+    for (const s of situacoes) {
+      if (!sitsByEstagio[s.estagio]) sitsByEstagio[s.estagio] = [];
+      sitsByEstagio[s.estagio].push(s);
+    }
+  }
+
+  function pickTipo(novoTipo: string) {
+    setTipo(novoTipo);
+    setSit("");
+    setNegativaOpen(false);
+  }
+  function pickSit(id: string) {
+    setSit(id);
+    setNegativaOpen(false);
+  }
+  // Strip o prefixo do canal pra UI mais limpa ("Ligação — Atendeu" → "Atendeu")
+  function curto(label: string): string {
+    const m = label.match(/^[^—]+—\s*(.+)$/);
+    return m ? m[1] : label;
   }
 
   function salvar(e: React.FormEvent) {
@@ -367,52 +434,184 @@ function ModalNovaInteracao({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={salvar} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-6 w-[560px] max-h-[90vh] overflow-auto space-y-3">
+      <form onSubmit={salvar} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-6 w-[540px] max-h-[90vh] overflow-auto space-y-4">
         <h3 className="font-bold text-lg" style={{ fontFamily: "'Alias Extended', sans-serif" }}>Nova interação</h3>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Tipo">
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white">
-              {TIPOS_INTERACAO.map((t) => <option key={t} value={t}>{t}</option>)}
+        <Field label="Quando">
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white"
+          />
+          <p className="text-[10px] text-[#6B6B6B] mt-1">vazio = agora · data futura = vira ação pendente</p>
+        </Field>
+
+        <Field label="Tipo de contato">
+          <div className="flex flex-wrap gap-1.5">
+            {MANUAL_TIPOS.map((t) => {
+              const Icon = t.Icon;
+              const sel = tipo === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => pickTipo(t.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors ${
+                    sel
+                      ? "bg-[#D4541A] text-white border-[#D4541A]"
+                      : "bg-white text-[#6B6B6B] border-[#E5E2DC] hover:border-[#D4541A] hover:text-[#0D0D0D]"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        {tipo === "outro" ? (
+          <Field label="Situação (todas — escape pra casos manuais)">
+            <select
+              value={situacaoId}
+              onChange={(e) => setSit(e.target.value)}
+              className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white"
+            >
+              <option value="">— sem situação (descreve no comentário) —</option>
+              {Object.entries(sitsByEstagio).map(([estagio, sits]) => (
+                <optgroup key={estagio} label={estagio}>
+                  {sits.map((s) => (
+                    <option key={s.situacaoId} value={s.situacaoId}>{s.icon} {s.label}</option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </Field>
-          <Field label="Data (deixa vazio = agora; futura = vira ação)">
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white" />
+        ) : (
+          <Field label="O que aconteceu">
+            {negativaOpen ? (
+              <div className="border border-[#E5E2DC] rounded overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setNegativaOpen(false)}
+                  className="flex items-center gap-1.5 w-full px-3 py-2 text-xs text-[#6B6B6B] hover:bg-[#F2F0EC] border-b border-[#E5E2DC]"
+                >
+                  <ArrowLeft className="w-3 h-3" /> voltar
+                </button>
+                {motivosNeg.map((s) => (
+                  <button
+                    key={s.situacaoId}
+                    type="button"
+                    onClick={() => pickSit(s.situacaoId)}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left hover:bg-[#F2F0EC] border-b border-[#E5E2DC] last:border-b-0 ${
+                      situacaoId === s.situacaoId ? "bg-[#FFF7F0] text-[#0D0D0D]" : ""
+                    }`}
+                  >
+                    <span className="text-base">{s.icon}</span>
+                    {curto(s.label)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="border border-[#E5E2DC] rounded overflow-hidden">
+                {sitsTipo.map((s) => (
+                  <button
+                    key={s.situacaoId}
+                    type="button"
+                    onClick={() => pickSit(s.situacaoId)}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left hover:bg-[#F2F0EC] border-b border-[#E5E2DC] last:border-b-0 ${
+                      situacaoId === s.situacaoId ? "bg-[#FFF7F0] text-[#0D0D0D]" : ""
+                    }`}
+                  >
+                    <span className="text-base">{s.icon}</span>
+                    {curto(s.label)}
+                  </button>
+                ))}
+                {pedidoSit && (
+                  <button
+                    type="button"
+                    onClick={() => pickSit(pedidoSit.situacaoId)}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left hover:bg-[#F2F0EC] border-b border-[#E5E2DC] last:border-b-0 ${
+                      situacaoId === pedidoSit.situacaoId ? "bg-[#FFF7F0] text-[#0D0D0D]" : ""
+                    }`}
+                  >
+                    <ShoppingCart className="w-4 h-4 text-[#00897B]" />
+                    Fechou pedido
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setNegativaOpen(true)}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-left hover:bg-[#F2F0EC] text-[#BF360C]"
+                >
+                  <Ban className="w-4 h-4" />
+                  Negativa
+                  <span className="ml-auto text-xs text-[#6B6B6B]">{motivosNeg.length} motivos →</span>
+                </button>
+                {sitsTipo.length === 0 && !pedidoSit && (
+                  <p className="text-xs text-[#6B6B6B] p-3 text-center">
+                    Sem situação específica pra {MANUAL_TIPOS.find((t) => t.id === tipo)?.label} — descreve no comentário ou usa Negativa.
+                  </p>
+                )}
+              </div>
+            )}
+            {situacaoId && !negativaOpen && (
+              <p className="text-[10px] text-[#6B6B6B] mt-1">
+                selecionada: <strong className="text-[#0D0D0D]">{sitMap[situacaoId]?.label}</strong>{" "}·{" "}
+                <button
+                  type="button"
+                  onClick={() => setSit("")}
+                  className="underline hover:text-[#0D0D0D]"
+                >
+                  limpar
+                </button>
+              </p>
+            )}
           </Field>
-        </div>
-
-        <Field label="Detalhe (situação)">
-          <select value={situacaoId} onChange={(e) => setSit(e.target.value)} className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white">
-            <option value="">— sem detalhe (texto livre) —</option>
-            {Object.entries(sitsAgrupadas).map(([estagio, sits]) => (
-              <optgroup key={estagio} label={estagio}>
-                {sits.map((s) => <option key={s.situacaoId} value={s.situacaoId}>{s.icon} {s.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           {contatos.length > 0 && (
             <Field label="Com quem">
-              <select value={contatoId} onChange={(e) => setContatoId(e.target.value)} className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white">
+              <select
+                value={contatoId}
+                onChange={(e) => setContatoId(e.target.value)}
+                className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white"
+              >
                 <option value="">—</option>
-                {contatos.map((c) => <option key={c.contatoId} value={c.contatoId}>{c.nome}{c.cargo ? ` (${c.cargo})` : ""}</option>)}
+                {contatos.map((c) => (
+                  <option key={c.contatoId} value={c.contatoId}>
+                    {c.nome}{c.cargo ? ` (${c.cargo})` : ""}
+                  </option>
+                ))}
               </select>
             </Field>
           )}
           {filhas.length > 0 && (
             <Field label="Loja específica">
-              <select value={lojaId} onChange={(e) => setLojaId(e.target.value)} className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white">
+              <select
+                value={lojaId}
+                onChange={(e) => setLojaId(e.target.value)}
+                className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white"
+              >
                 <option value="">— afeta todas —</option>
-                {filhas.map((f) => <option key={f.contaId} value={f.contaId}>{f.nome}</option>)}
+                {filhas.map((f) => (
+                  <option key={f.contaId} value={f.contaId}>{f.nome}</option>
+                ))}
               </select>
             </Field>
           )}
         </div>
 
-        <Field label="Comentário">
-          <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} placeholder="Detalhes livres..." className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white" />
+        <Field label="Comentário (opcional)">
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            rows={2}
+            placeholder="Detalhe livre..."
+            className="w-full px-2 py-1.5 border border-[#E5E2DC] rounded bg-white"
+          />
         </Field>
 
         <div className="flex gap-2 justify-end pt-2 border-t">
