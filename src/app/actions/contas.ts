@@ -10,8 +10,14 @@ import {
   type Conta,
 } from "@/db/schema";
 import { auth } from "@/auth";
-import { eq, and, sql, count, asc, lte, desc, isNull, inArray } from "drizzle-orm";
+import { eq, and, sql, count, asc, lte, desc, isNull, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "crypto";
+
+// Canais que entram no fluxo de "par lig+wa".
+const CANAIS_PAR = ["ligacao", "whatsapp"] as const;
+// Situações "tentativa falhou" — só essas mantêm a perna parceira pendente.
+const SITUACOES_TENTATIVA_FALHA = ["lig_nao_atendeu", "wa_nao_respondeu"] as const;
 
 function fmtISODate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -64,6 +70,7 @@ export async function criarInteracao(
     lojaId?: number | null;
     dataPrevista?: string | null; // se preenchida, vira ação futura
     descricao?: string | null;
+    respondendoInteracaoId?: number | null; // id da pendente sendo resolvida (herda grupo + marca como feita)
   }
 ): Promise<{
   ok: boolean;
@@ -80,9 +87,41 @@ export async function criarInteracao(
     // 1. Determinar se essa interação é REALIZADA (data passada/hoje) ou PENDENTE (futura)
     const agora = new Date();
     const dataPrevistaDate = dados.dataPrevista ? new Date(dados.dataPrevista + "T12:00:00Z") : null;
-    const ehPendente = dataPrevistaDate && dataPrevistaDate > agora;
+    const ehPendente = !!(dataPrevistaDate && dataPrevistaDate > agora);
+    const ehCanalPar = (CANAIS_PAR as readonly string[]).includes(dados.tipo);
 
-    // Conta tentativas anteriores com a mesma situação
+    // 2. Determinar tentativa_grupo_id (apenas pra lig/wa)
+    let grupoId: string | null = null;
+    if (ehCanalPar && !ehPendente) {
+      // 2a. Se respondendo a uma pendente, herda o grupo
+      if (dados.respondendoInteracaoId) {
+        const [pend] = await db.select({ g: interacao.tentativaGrupoId })
+          .from(interacao).where(eq(interacao.interacaoId, dados.respondendoInteracaoId));
+        if (pend?.g) grupoId = pend.g;
+      }
+      // 2b. Senão, procura grupo aberto (outra perna pendente OU realizada-falha) na mesma conta nos últimos 7d
+      if (!grupoId) {
+        const outroTipo = dados.tipo === "ligacao" ? "whatsapp" : "ligacao";
+        const aberto = await db.execute(sql`
+          select tentativa_grupo_id from b2b.interacao
+          where conta_id = ${contaId}
+            and tipo = ${outroTipo}
+            and tentativa_grupo_id is not null
+            and (
+              status = 'pendente'
+              or (status in ('realizada','feita') and situacao_id in ('lig_nao_atendeu','wa_nao_respondeu'))
+            )
+            and created_at > now() - interval '7 days'
+          order by created_at desc limit 1`);
+        const rows = ((aberto as unknown as { rows?: { tentativa_grupo_id: string }[] }).rows
+          ?? (aberto as unknown as { tentativa_grupo_id: string }[])) as { tentativa_grupo_id: string }[];
+        if (rows && rows[0]) grupoId = rows[0].tentativa_grupo_id;
+      }
+      // 2c. Senão, abre novo grupo (frio ou tentativa nova)
+      if (!grupoId) grupoId = randomUUID();
+    }
+
+    // 3. Conta tentativas anteriores com a mesma situação
     let tentativaNum = 1;
     if (dados.situacaoId && !ehPendente) {
       const tents = await db.select({ n: count() }).from(interacao).where(
@@ -95,7 +134,7 @@ export async function criarInteracao(
       tentativaNum = (tents[0]?.n ?? 0) + 1;
     }
 
-    // 2. Inserir entrada (realizada ou pendente)
+    // 4. Inserir entrada (realizada ou pendente)
     await db.insert(interacao).values({
       contaId,
       tipo: dados.tipo,
@@ -110,7 +149,13 @@ export async function criarInteracao(
       dataPrevista: ehPendente ? dados.dataPrevista : null,
       tentativaNum,
       origem: "manual",
+      tentativaGrupoId: grupoId,
     });
+
+    // 5. Marcar pendente original como feita (subsume marcarAcaoFeita)
+    if (dados.respondendoInteracaoId) {
+      await db.update(interacao).set({ status: "feita" }).where(eq(interacao.interacaoId, dados.respondendoInteracaoId));
+    }
 
     if (ehPendente) {
       // Pendentes não disparam cadência — são ação manual agendada
@@ -119,7 +164,18 @@ export async function criarInteracao(
       return { ok: true };
     }
 
-    // 3. Processar situação (auto_funil + cadência) — só pra realizadas
+    // 6. PAR lig+wa: cancela perna parceira pendente se situação NÃO é "tentativa falha"
+    const ehFalhaTentativa = dados.situacaoId
+      ? (SITUACOES_TENTATIVA_FALHA as readonly string[]).includes(dados.situacaoId)
+      : false;
+    if (ehCanalPar && grupoId && !ehFalhaTentativa) {
+      await db.update(interacao).set({ status: "cancelada" }).where(and(
+        eq(interacao.tentativaGrupoId, grupoId),
+        eq(interacao.status, "pendente"),
+      ));
+    }
+
+    // 7. Processar situação (auto_funil + cadência) — só pra realizadas
     const avisos: string[] = [];
     let proximaAcao: { dataPrevista: string; descricao: string } | undefined;
     let funilMovido: { de: string; para: string } | undefined;
@@ -131,7 +187,6 @@ export async function criarInteracao(
 
       // Auto-funil (SUGESTÃO, não bloqueia — filosofia GPS)
       if (s?.autoFunil && s.autoFunil !== c?.funilStage) {
-        // Avisar se está pulando pra venda sem cadastro/homologação
         if (["pedido_realizado", "positivada"].includes(s.autoFunil)) {
           const [extras] = await db.select({
             requerHom: conta.requerHomologacao,
@@ -162,51 +217,83 @@ export async function criarInteracao(
         const isHom = dados.situacaoId === "homologacao_aprovada";
         if (isHom) {
           await db.update(conta).set({ statusHomologacao: "aprovada", updatedAt: new Date() }).where(eq(conta.contaId, contaId));
-          // Propaga pra filhas se for matriz
           await db.update(conta).set({ statusHomologacao: "aprovada", updatedAt: new Date() }).where(eq(conta.contaMatrizId, contaId));
         }
       }
 
-      // Cadência: cria nova interação status=pendente
-      const [regra] = await db.select().from(regraCadencia).where(
-        and(
-          eq(regraCadencia.situacaoId, dados.situacaoId),
-          eq(regraCadencia.ativa, true),
-          eq(regraCadencia.versao, 1),
-          lte(regraCadencia.tentativaMin, tentativaNum),
-          sql`(${regraCadencia.tentativaMax} IS NULL OR ${regraCadencia.tentativaMax} >= ${tentativaNum})`,
-        )
-      ).orderBy(asc(regraCadencia.ordem)).limit(1);
-
-      if (regra) {
-        // Move funil se regra exige
-        if (regra.moveFunilPara && regra.moveFunilPara !== c?.funilStage) {
-          await db.update(conta).set({ funilStage: regra.moveFunilPara, updatedAt: new Date() }).where(eq(conta.contaId, contaId));
-          funilMovido = funilMovido ?? { de: c?.funilStage ?? "", para: regra.moveFunilPara };
+      // 8. CADÊNCIA — comportamento depende se é canal-par ou não
+      // Pra canal-par: só dispara quando tentativa fechou (ambas pernas resolvidas OU 1 perna teve sucesso terminal)
+      // Pra outros: dispara normal (cria 1 pendente)
+      let dispararCadencia = !ehCanalPar; // não-canal: sempre dispara
+      if (ehCanalPar && grupoId) {
+        if (!ehFalhaTentativa) {
+          // sucesso terminal numa perna → fecha tentativa imediatamente
+          dispararCadencia = true;
+        } else {
+          // perna falhou — checa se a outra também já fechou
+          const fechadoQ = await db.execute(sql`
+            select
+              bool_or(tipo='ligacao' and status in ('realizada','feita','cancelada')) lig_resolvido,
+              bool_or(tipo='whatsapp' and status in ('realizada','feita','cancelada')) wa_resolvido
+            from b2b.interacao where tentativa_grupo_id = ${grupoId}`);
+          const rows = ((fechadoQ as unknown as { rows?: { lig_resolvido: boolean; wa_resolvido: boolean }[] }).rows
+            ?? (fechadoQ as unknown as { lig_resolvido: boolean; wa_resolvido: boolean }[])) as { lig_resolvido: boolean; wa_resolvido: boolean }[];
+          dispararCadencia = !!(rows[0]?.lig_resolvido && rows[0]?.wa_resolvido);
         }
+      }
 
-        // Cria próxima pendente (se regra tem dias)
-        if (regra.diasProximaAcao !== null) {
-          // Cancela pendentes anteriores (exceto fulfillment/pos_venda)
-          await db.update(interacao)
-            .set({ status: "cancelada" })
-            .where(and(
-              eq(interacao.contaId, contaId),
-              eq(interacao.status, "pendente"),
-              sql`(${interacao.origem} IS NULL OR ${interacao.origem} NOT IN ('fulfillment','pos_venda'))`,
-            ));
+      if (dispararCadencia) {
+        const [regra] = await db.select().from(regraCadencia).where(
+          and(
+            eq(regraCadencia.situacaoId, dados.situacaoId),
+            eq(regraCadencia.ativa, true),
+            eq(regraCadencia.versao, 1),
+            lte(regraCadencia.tentativaMin, tentativaNum),
+            sql`(${regraCadencia.tentativaMax} IS NULL OR ${regraCadencia.tentativaMax} >= ${tentativaNum})`,
+          )
+        ).orderBy(asc(regraCadencia.ordem)).limit(1);
 
-          const dataPrev = fmtISODate(addDays(agora, Number(regra.diasProximaAcao)));
-          await db.insert(interacao).values({
-            contaId,
-            tipo: regra.tipoProximaAcao,
-            descricao: regra.descricaoAcao,
-            autor,
-            status: "pendente",
-            dataPrevista: dataPrev,
-            origem: "cadencia",
-          });
-          proximaAcao = { dataPrevista: dataPrev, descricao: regra.descricaoAcao };
+        if (regra) {
+          if (regra.moveFunilPara && regra.moveFunilPara !== c?.funilStage) {
+            await db.update(conta).set({ funilStage: regra.moveFunilPara, updatedAt: new Date() }).where(eq(conta.contaId, contaId));
+            funilMovido = funilMovido ?? { de: c?.funilStage ?? "", para: regra.moveFunilPara };
+          }
+
+          if (regra.diasProximaAcao !== null) {
+            // Cancela pendentes anteriores não-fulfillment (limpa fila pra próxima)
+            await db.update(interacao)
+              .set({ status: "cancelada" })
+              .where(and(
+                eq(interacao.contaId, contaId),
+                eq(interacao.status, "pendente"),
+                sql`(${interacao.origem} IS NULL OR ${interacao.origem} NOT IN ('fulfillment','pos_venda'))`,
+              ));
+
+            const dataPrev = fmtISODate(addDays(agora, Number(regra.diasProximaAcao)));
+            // Decide: a próxima ação é canal-par? Se sim, cria PAR (lig + wa) com novo grupo
+            const proxTipoEhPar = (CANAIS_PAR as readonly string[]).includes(regra.tipoProximaAcao);
+            if (proxTipoEhPar) {
+              const novoGrupo = randomUUID();
+              await db.insert(interacao).values({
+                contaId, tipo: "ligacao", descricao: regra.descricaoAcao,
+                autor, status: "pendente", dataPrevista: dataPrev,
+                origem: "cadencia", tentativaGrupoId: novoGrupo,
+              });
+              await db.insert(interacao).values({
+                contaId, tipo: "whatsapp", descricao: regra.descricaoAcao,
+                autor, status: "pendente", dataPrevista: dataPrev,
+                origem: "cadencia", tentativaGrupoId: novoGrupo,
+              });
+            } else {
+              // não-canal (proposta, fup, etc) — pendente single
+              await db.insert(interacao).values({
+                contaId, tipo: regra.tipoProximaAcao, descricao: regra.descricaoAcao,
+                autor, status: "pendente", dataPrevista: dataPrev,
+                origem: "cadencia",
+              });
+            }
+            proximaAcao = { dataPrevista: dataPrev, descricao: regra.descricaoAcao };
+          }
         }
       }
 
@@ -219,12 +306,8 @@ export async function criarInteracao(
         ];
         for (const f of fulfillment) {
           await db.insert(interacao).values({
-            contaId,
-            tipo: f.tipo,
-            descricao: f.desc,
-            autor,
-            status: "pendente",
-            dataPrevista: fmtISODate(addDays(agora, f.d)),
+            contaId, tipo: f.tipo, descricao: f.desc, autor,
+            status: "pendente", dataPrevista: fmtISODate(addDays(agora, f.d)),
             origem: "fulfillment",
           });
         }
@@ -239,12 +322,8 @@ export async function criarInteracao(
         ];
         for (const p of posVenda) {
           await db.insert(interacao).values({
-            contaId,
-            tipo: p.tipo,
-            descricao: p.desc,
-            autor,
-            status: "pendente",
-            dataPrevista: fmtISODate(addDays(agora, p.d)),
+            contaId, tipo: p.tipo, descricao: p.desc, autor,
+            status: "pendente", dataPrevista: fmtISODate(addDays(agora, p.d)),
             origem: "pos_venda",
           });
         }
@@ -412,11 +491,12 @@ export type AcaoListagem = {
   tel: string | null;
   wa: string | null;
   funilStage: string;
+  tentativaGrupoId: string | null;
 };
 
 export async function getAcoesDaPessoa(pessoa: string): Promise<AcaoListagem[]> {
   const r = await db.execute(sql`
-    SELECT i.interacao_id, i.tipo, i.descricao, i.data_prevista, i.origem,
+    SELECT i.interacao_id, i.tipo, i.descricao, i.data_prevista, i.origem, i.tentativa_grupo_id,
            c.conta_id, c.nome AS conta_nome, c.cidade, c.uf, c.funil_stage,
            c.telefone_institucional AS tel, c.whatsapp_institucional AS wa,
            (SELECT ct.nome FROM b2b.contato ct WHERE ct.conta_id=c.conta_id ORDER BY ct.e_principal DESC LIMIT 1) AS contato_principal
@@ -450,6 +530,7 @@ export async function getAcoesDaPessoa(pessoa: string): Promise<AcaoListagem[]> 
     tel: (x.tel as string) ?? null,
     wa: (x.wa as string) ?? null,
     funilStage: String(x.funil_stage),
+    tentativaGrupoId: (x.tentativa_grupo_id as string) ?? null,
   }));
 }
 
@@ -487,5 +568,6 @@ export async function getFriosDaPessoa(pessoa: string, limit = 50): Promise<Acao
     tel: (x.tel as string) ?? null,
     wa: (x.wa as string) ?? null,
     funilStage: String(x.funil_stage),
+    tentativaGrupoId: null,
   }));
 }

@@ -120,6 +120,7 @@ export const interacao = b2b.table("interacao", {
   dataPrevista: date("data_prevista"),           // quando vai acontecer (pendente)
   tentativaNum: bigint("tentativa_num", { mode: "number" }),
   origem: text("origem").default("manual"),      // manual | cadencia | fulfillment | pos_venda
+  tentativaGrupoId: text("tentativa_grupo_id"),  // par lig+wa compartilha o mesmo grupo
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { criarInteracao, adiarAcao, marcarAcaoFeita, type AcaoListagem } from "@/app/actions/contas";
+import { criarInteracao, adiarAcao, type AcaoListagem } from "@/app/actions/contas";
 import { toast } from "sonner";
 import { Phone, MessageCircle, ExternalLink } from "lucide-react";
 
@@ -25,12 +25,13 @@ export function CardAcao({ acao }: { acao: AcaoListagem }) {
 
   async function registrar(sit: string, tipo: string, label: string) {
     start(async () => {
-      const r = await criarInteracao(acao.contaId, { tipo, situacaoId: sit, texto: `Quick log: ${label}` });
+      const r = await criarInteracao(acao.contaId, {
+        tipo, situacaoId: sit, texto: `Quick log: ${label}`,
+        respondendoInteracaoId: acao.interacaoId > 0 ? acao.interacaoId : null,
+      });
       if (r.ok) {
         const msg = r.proximaAcao ? `${label} · próx: ${r.proximaAcao.descricao}` : label;
         toast.success(msg);
-        // Se essa ação tinha interacaoId, marca como feita
-        if (acao.interacaoId > 0) await marcarAcaoFeita(acao.interacaoId);
       } else toast.error(r.error || "Falha");
     });
   }
