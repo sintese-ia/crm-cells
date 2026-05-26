@@ -520,7 +520,7 @@ export async function getAcoesDaPessoa(pessoa: string): Promise<AcaoListagem[]> 
     FROM b2b.interacao i
     JOIN b2b.conta c ON c.conta_id = i.conta_id
     WHERE i.status = 'pendente'
-      AND i.autor = ${pessoa}
+      AND c.responsavel = ${pessoa}
       AND i.data_prevista <= CURRENT_DATE + INTERVAL '14 days'
     ORDER BY
       CASE
